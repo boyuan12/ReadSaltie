@@ -1,6 +1,6 @@
 Flask
 Flask-Session
-Werkzeug
+Werkzeug==0.9.6
 Flask-SQLAlchemy
 SQLAlchemy
 Flask-Dance
