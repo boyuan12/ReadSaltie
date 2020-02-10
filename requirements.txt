@@ -1,7 +1,6 @@
 Flask
 Flask-Session
 Werkzeug
-tempfile
 Flask-SQLAlchemy
 SQLAlchemy
 Flask-Dance
