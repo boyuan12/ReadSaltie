@@ -7,7 +7,6 @@ from tempfile import mkdtemp
 import datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import update, desc, text
-from collections import defaultdict
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
 from static import *
@@ -36,6 +35,7 @@ def after_request(response):
     response.headers['X-XSS-Protection'] = '1; mode=block'
     return response
 
+
 # Set up SQLAlchemy Connection
 SQLALCHEMY_DATABASE_URI = "mysql+mysqlconnector://{username}:{password}@{hostname}/{databasename}".format(
     username="boyuanliu6",
@@ -48,6 +48,9 @@ app.config["SQLALCHEMY_POOL_RECYCLE"] = 299
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
+# SQL ORM database models
+
+
 class User(db.Model):
 
     __tablename__ = "users"
@@ -59,6 +62,7 @@ class User(db.Model):
     status = db.Column(db.String(4096))
     verification = db.Column(db.String(4096))
 
+
 class Post(db.Model):
 
     __tablename__ = "posts"
@@ -68,6 +72,7 @@ class Post(db.Model):
     contents = db.Column(db.Text)
     location = db.Column(db.String(4096))
     timestamp = db.Column(db.String(4096))
+
 
 class Book(db.Model):
 
@@ -82,6 +87,7 @@ class Book(db.Model):
     embedCode = db.Column(db.Text)
     rating = db.Column(db.String(10))
 
+
 class Comment(db.Model):
 
     __tablename__ = "comments"
@@ -90,6 +96,7 @@ class Comment(db.Model):
     username = db.Column(db.String(4096))
     text = db.Column(db.Text)
     location = db.Column(db.String(4096))
+
 
 class Error(db.Model):
 
@@ -100,25 +107,37 @@ class Error(db.Model):
     method = db.Column(db.String(100))
     detail = db.Column(db.Text)
 
+
+# Create all database
 db.create_all()
 
 
+# Index route
 @app.route("/")
 def home():
     posts = Post.query.filter_by(location='Event')
     return render_template("index.html", posts=posts)
 
+# register route
 @app.route("/register", methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+
+        # check for required fields are all filled in (in case js is disabled)
         if not request.form.get("username") or not request.form.get('password') or not request.form.get('email') or not request.form.get('confirmation'):
             return render_template('alert.html', message="Make sure you filled out all required fields.")
+
+        # Set up variables for later use
         email = request.form.get('email')
         username = request.form.get('username')
         password = request.form.get('password')
         confirmation = request.form.get('confirmation')
+
+        # Check for password confirmation (in case js is disabled)
         if password != confirmation:
             return render_template('alert.html', message='INCORRECT PASSWORD/CONFIRMATION')
+
+        # Check for username/email is already registered or not
         user = User.query.filter_by(username=username).first()
         userEmail = User.query.filter_by(email=email).first()
         try:
@@ -131,29 +150,48 @@ def register():
                 return render_template('alert.html', message='Email Already Registered, maybe try to forgot password?')
         except AttributeError:
             pass
+
+        # Generate password and verification string (see static.py for randomString function definition)
         pwHash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
         verificationCode = randomString(75)
+
+        # Add user
         registrant = User(email=email, username=username, password=pwHash, status="user", verification=verificationCode)
         db.session.add(registrant)
         db.session.commit()
-        send_email(email, "Verify your Saltie Nation Account!", "Click following link to access " + "https://boyuanliu6.pythonanywhere.com/verification/" + verificationCode)
-        return render_template('success.html', message='Successfully Registered')
+
+        # Send email (see static.py for send_email function definition)
+        send_email(email, "Verify your Saltie Nation Account!", "Click following link to access " +
+                   "https://boyuanliu6.pythonanywhere.com/verification/" + verificationCode)
+
+        # return user to login route and login
         return redirect("/login")
     else:
+        # return register.html if it's GET method
         return render_template('register.html')
 
+
+# Login route definition
 @app.route("/login", methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+
+        # Get required information
         username = request.form.get('username')
         password = request.form.get('password')
+
+        # Get user's information
         user = User.query.filter_by(username=username).first()
+
+        # Check and see if its valid info or not
         if not user:
             return render_template('alert.html', message='Wrong Username')
         if user.password == '(Google)':
             return redirect('/google')
         if not check_password_hash(user.password, password):
             return render_template('alert.html', message='Wrong Password')
+
+        # Set up session, verification, etc.
         global user_id
         user_id = user.id
         global status
@@ -167,51 +205,78 @@ def login():
         session["username"] = username
         session['status'] = status
         session['email'] = user.email
+
+        # Check if user is temporary banned from website
         if 'banned' in status is not True:
             session.clear()
             return render_template('alert.html', message="Hello, you've been temporarily banned from our website. Please contact administrator for more detail")
+
+        # if it redirect from other route, next route maybe provided and will redirect user to the corresponding route
         if request.args.get('next'):
             return redirect(request.args.get('next'))
+
+        # redirect to homepage as default action (if next parameter is not provided)
         return redirect('/')
     else:
         return render_template('login.html')
 
+
+# route for admin-user dashboard
 @app.route("/admin/users")
 @login_required
-# @verification_required
 def admin_users():
+    # check for valid status (only admin and staff-(generalist)) have right to access
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
         return render_template('alert.html', message="403 FORBIDDENED")
+
+    # get all the user from database and send it to admin-user.html
     all_rows = User.query.all()
     return render_template('admin-users.html', users=all_rows)
 
+
+# route for admin-delete user
 @app.route("/admin/delete", methods=['GET', 'POST'])
 @login_required
 def delete_user():
+    # check for valid status (only admin can delete user)
     if session['status'] == 'user' or session['status'] == 'staff-(generalist)' or session['status'] == 'staff-(user manager)':
         return render_template('alert.html', message="403 FORBIDDENED")
+
     if request.method == 'POST':
+        # Get required information
         id = request.form.get('id')
         comment = request.form.get('comment')
         user = User.query.filter_by(id=id).first()
         email = user.email
         username = user.username
-        send_email(email, 'Removal Notification from Official Saltie National Broadcasting Channel', 'Dear ' + username + "\n, You have been removed from Official Saltie National Broadcasting Channel. There is a comment from administrator who handle this. \n" + comment + "\n Thank you, admin from Official Saltie National Broadcasting Channel \n If you feel it's not fair, please send an email to us")
+
+        # Send removal notification email
+        send_email(email, 'Removal Notification from Official Saltie National Broadcasting Channel', 'Dear ' + username + "\n, You have been removed from Official Saltie National Broadcasting Channel. There is a comment from administrator who handle this. \n" +
+                   comment + "\n Thank you, admin from Official Saltie National Broadcasting Channel \n If you feel it's not fair, please send an email to us")
+
+        # Delete user and commit
         User.query.filter(User.id == id).delete(synchronize_session='evaluate')
         db.session.commit()
         return redirect("/admin/users")
     else:
         return render_template("user-delete-form.html")
 
+
+# route for modify user's status ONLY
 @app.route("/admin/modify", methods=['GET', 'POST'])
 @login_required
 def modify_user():
+    # Check for valid status, only admin and staff-(generalist) can access
     if session['status'] == 'user' or session['status'] == 'staff-(generalist)':
         return render_template('alert.html', message="403 FORBIDDENED")
+
     if request.method == 'POST':
+        # Get required informations
         id = request.form.get('id')
         status = request.form.get('status')
         identifier = request.form.get('identifier')
+
+        # modify user's status
         user = User.query.filter_by(id=id).first()
         if status == 'staff':
             user.status = status + "-" + "(" + identifier + ")"
@@ -222,18 +287,26 @@ def modify_user():
     else:
         return render_template('user-status-form.html')
 
+
+# route for add-file
 @app.route("/admin/add-file", methods=['GET', 'POST'])
 @login_required
 def add_file():
+    # check for valid status, only admin can access
     if session['status'] == 'user' or session['status'] == 'staff-(generalist)' or session['status'] == 'staff-(user manager)':
         return render_template('alert.html', message="403 FORBIDDENED")
+
     if request.method == 'POST':
+
+        # upload file
         file = request.files["file"]
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], file.filename))
         return render_template('index.html')
     else:
         return render_template("admin-home.html")
 
+
+# route for logout
 @app.route("/logout")
 @login_required
 def logout():
@@ -245,18 +318,30 @@ def logout():
     # Redirect user to login form
     return redirect("/")
 
+
 @app.route("/verification")
 def verification():
     return render_template("verification.html")
 
+# verification with a token roue
 @app.route("/verification/<string:token>")
 def verify(token):
+
+    # create an empty dict
     verificationDict = {}
+
+    # find the user with the token
     verifyToken = User.query.filter_by(verification=token).first()
+
+    # add ALL token information to verificationDict
     try:
         verificationDict.update({verifyToken.verification: verifyToken.id})
+
+    # except error if no token find
     except AttributeError:
         return render_template('alert.html', message='NO TOKEN FOUND!')
+
+    # if token found, change user's status to verified
     if token in verificationDict:
         idOfUser = verificationDict[token]
         user = User.query.filter(User.id == idOfUser).one()
@@ -271,64 +356,105 @@ def verify(token):
 
 @app.route("/forgotpassword", methods=['GET', 'POST'])
 def forgotpassword():
+
+    # create forgotPasswordDict
     global forgotPasswordDict
     forgotPasswordDict = {}
+
     if request.method == 'POST':
+
+        # check for required field to fill out
         if not request.form.get('email'):
             return render_template('alert.html', message="Please fill out all required fields")
+
+        # Generate a code that will send to user
         forgotPasswordCode = randomString(75)
         email = request.form.get('email')
+
+        # See if user exists
         try:
             user = User.query.filter_by(email=email)
             user_email = user.email
         except:
             return render_template('alert.html', message="Email not found, is this right email address? Did you registered using this email address?")
+
+        # Add this to dict, and send email
         forgotPasswordDict.update({forgotPasswordCode: email})
-        send_email(email, 'Important! Request Password Change at Saltie National Broadcasting Channel', 'Important, someone request a password change for your account at Saltie National Broadcasting Channel. If you did, click followling link to reset your password: https://boyuanliu6.pythonanywhere.com/forgotpassword/' + forgotPasswordCode + ' If you didn\'t request it, don\'t be worry, your password is still the same.')
+        send_email(email, 'Important! Request Password Change at Saltie National Broadcasting Channel', 'Important, someone request a password change for your account at Saltie National Broadcasting Channel. If you did, click followling link to reset your password: https://boyuanliu6.pythonanywhere.com/forgotpassword/' +
+                   forgotPasswordCode + ' If you didn\'t request it, don\'t be worry, your password is still the same.')
         return render_template("success.html", message='Please check your email address for link to reset your password.')
     else:
         return render_template('forgot-password.html')
 
+
+# forgotpassword route - logic similar to /verification/<string:token>
 @app.route("/forgotpassword/<string:token>")
 def getnewpassword(token):
+
+    # check see if the token is in the forgotPasswordDict
     if token in forgotPasswordDict:
+
+        # store email identified into a global variable
         global forgotEmail
         forgotEmail = forgotPasswordDict[token]
+
+        # delete this token immediately
         del forgotPasswordDict[token]
+
+        # select all users
         users = User.query.all()
-        emailList=[]
+
+        # check if user's email is in the database
+        emailList = []
         for user in users:
             emailList.append(user.email)
         if forgotEmail in emailList:
             return render_template("new-password.html", email=forgotEmail)
+
+        # return if email isn't exist
         else:
             return render_template('alert.html', message='Email address is not registered.')
     else:
         return render_template('alert.html', message='FORGOT PASSWORD TOKEN NOT FOUND!')
 
+
+# route for user to enter new password
 @app.route("/new-password", methods=['GET', 'POST'])
 def new_password():
     if request.method == 'POST':
+
+        # get all required fields
         password = request.form.get('password')
         confirmation = request.form.get('confirmation')
+
+        # check see if password = confirmation
         if password != confirmation:
             return render_template('alert.html', message='Confirmation must be same as new password')
+
+        # commit the change
         pwHash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
         user = User.query.filter_by(email=forgotEmail).first()
         user.password = pwHash
         db.session.commit()
         return redirect("/")
+
     else:
+
+        # try and see forgotEmail global var declared or not (based on /forgotpassword/...)
         try:
             return render_template('new-password.html', email=forgotEmail)
         except NameError:
             return render_template('alert.html', message='System didn\'t found your email address, maybe try to do forgot password first?')
 
+
+# 404 error handler
 @app.errorhandler(404)
 def page_not_found(e):
     # note that we set the 404 status explicitly
     return render_template('alert.html', message='404 NOT FOUND'), 404
 
+
+# 500 error handler
 @app.errorhandler(500)
 def internal_server_error(e):
     error = Error(location=request.url, method=request.method, detail=str(e.args))
@@ -336,36 +462,60 @@ def internal_server_error(e):
     db.session.commit()
     return render_template('alert.html', message='500 INTERNAL SERVER ERROR: This is SNBC Channel Staff. Sorry, we were expriencing some technical issues. Please Understand this site is under active development right now. Sorry.', info=str(e)), 500
 
+
+# route for editing page
 @app.route("/admin/edit/homepage", methods=['GET', 'POST'])
 def edit_homepage():
+
+    # check for valid status
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
         return render_template('alert.html', message="403 FORBIDDENED")
+
     if request.method == 'POST':
+
+        # Get all required infomration
         htmlScript = request.form.get('html-script')
         location = request.form.get('location')
+
+        # Get time
         ts = datetime.datetime.now().timestamp()
         readable = datetime.datetime.fromtimestamp(ts).isoformat()
+
+        # Add to database
         post = Post(username=session['username'], contents=htmlScript, location=location, timestamp=readable)
         db.session.add(post)
         db.session.commit()
+
         return render_template('success.html', message='submit success')
     else:
         return render_template("admin-edit-homepage.html")
 
+
+# Headline page (same logic as "/")
 @app.route("/headline")
 def headline():
     posts = Post.query.filter_by(location='headline')
     return render_template("headline.html", posts=posts)
 
+
+# music route
 @app.route('/music')
 def music():
     return render_template('music.html')
 
+
+# Books route, show all the books
 @app.route('/books', methods=['GET'])
 @verification_required
 def books():
+
+    # if user query for certain book
     if request.args.get('title'):
+
+        # get title from GET request
         title = request.args.get('title')
+
+        # Search the database
         search = "%{}%".format(title)
         books = Book.query.filter(Book.title.like(search)).order_by(desc(Book.id))
         return render_template('book-searched.html', books=books)
@@ -373,121 +523,180 @@ def books():
         books = Book.query.order_by(desc(Book.id))
         return render_template('books.html', books=books)
 
+
+# Add books, need verification
 @app.route('/books/add', methods=['GET', 'POST'])
 @verification_required
 def book_add():
+
     if request.method == 'POST':
+
+        # get request info
         if not request.form.get('title') or not request.form.get('description') or not request.form.get('embed'):
             return render_template('alert.html', message='Make sure you filled out all required field(s)!')
 
+        # Check for XSS security
         if "script" in request.form.get('embed') is not True or "onerror" in request.form.get('embed') is not True:
-            send_email(session['email'], 'Temporary Banned From ReadSaltie', 'Dear user, Your are temporary banned from ReadSaltie due to violation of term of use and potential opporotunity of hacking. There should be a staff responding to this incident around 72 hours. Feel free to email back if you have any problem. Thanks.')
-            send_email('longlivesaltienation@gmail.com', 'Banned Pending Request', 'Staff, username: {}, email: {}, have been temporary banned from website due to B1. Embed Code: {}, please respond within 72 hours. Thanks.'.format(session['username'], session['email'], request.form.get('embed')))
+            send_email(session['email'], 'Temporary Banned From ReadSaltie',
+                       'Dear user, Your are temporary banned from ReadSaltie due to violation of term of use and potential opporotunity of hacking. There should be a staff responding to this incident around 72 hours. Feel free to email back if you have any problem. Thanks.')
+            send_email('longlivesaltienation@gmail.com',
+                       'Banned Pending Request', 'Staff, username: {}, email: {}, have been temporary banned from website due to B1. Embed Code: {}, please respond within 72 hours. Thanks.'.format(session['username'], session['email'], request.form.get('embed')))
+
+            # Banned user to database
             user = User.query.filter_by(email=session['email']).first()
             user.status = 'banned'
             db.session.commit()
             session.clear()
             return render_template('alert.html', message="Sorry, we are in suspicious that your embed code may contain something that is not supposed to be in there. You are temporaily banned from using this website. Admin will be notified and an auto-generated email will send to your inbox. Thanks.")
 
+        # if passed XSS checking, add to the database
         title = request.form.get('title')
         titleDb = Book.query.filter_by(title=title).first()
+
+        # Check whether the title already exist or not
         try:
             if titleDb.title == title:
                 return render_template('alert.html', message='Title already used.')
         except AttributeError:
             pass
+
+        # Get required information
         description = request.form.get('description')
         embed = request.form.get('embed')
+
+        # Get current time
         ts = datetime.datetime.now().timestamp()
         timestamp = datetime.datetime.fromtimestamp(ts).isoformat()
+
+        # Save file
         file = request.files["image"]
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], file.filename))
+
+        # Add special admin badge in author when its author is an admin
         if session['status'] == 'admin':
-            book = Book(username=session['username'] + " (admin)", timestamp=timestamp, title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating')
+            book = Book(username=session['username'] + " (admin)", timestamp=timestamp,
+                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating')
         else:
-            book = Book(username=session['username'], timestamp=timestamp, title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating')
+            book = Book(username=session['username'], timestamp=timestamp, title=title,
+                        description=description, image_name=file.filename, embedCode=embed, rating='No rating')
+
+        # Add book
         db.session.add(book)
         db.session.commit()
         return render_template('success.html', message='success', link="/books/read/" + title)
     else:
         return render_template('admin-books-add.html')
 
+
+# admin view book interface
 @app.route('/admin/books/all')
 @login_required
 def admin_book_all():
+
+    # Check for valid status
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
         return render_template('alert.html', message="403 FORBIDDENED")
+
+    # Search the book, order by latest order
     books = Book.query.order_by(desc(Book.id))
     return render_template('admin-books-all.html', books=books)
 
+
+# Delete books - admin
 @app.route('/admin/books/delete', methods=['GET'])
 @login_required
 def admin_book_delete():
+
+    # Check for valid status
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
         return render_template('alert.html', message="403 FORBIDDENED")
+
+    # Check for required credentials
     if not request.args.get('book'):
         return render_template('alert.html', message="Missing Infos")
+
+    # Delete books from database and image from storage
     id = request.args.get('book')
-    book=Book.query.filter_by(id=id).first()
+    book = Book.query.filter_by(id=id).first()
     image_name = book.image_name
     os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image_name))
     Book.query.filter(Book.id == id).delete(synchronize_session='evaluate')
     db.session.commit()
     return render_template('success.html', message='Delete Success', link="/admin/books/all")
 
+
+# Read a book
 @app.route('/books/read/<string:title>')
 def read_book(title):
+
+    # find appropriate title based on route
     titleDb = Book.query.filter_by(title=title).all()
+
+    # Check for all title, see which one matches
     for titles in titleDb:
         if titles.title == title:
             comments = Comment.query.filter_by(location=title).all()
-            return render_template('book-read.html', embedCode=titles.embedCode, title=titles.title, comments=comments) # , embedCode=titles.embedCode
+            return render_template('book-read.html', embedCode=titles.embedCode, title=titles.title, comments=comments)
+
+    # Return this if no book found
     return render_template('alert.html', message='NOT FOUND')
 
-@app.route("/comment", methods=['GET', 'POST'])
+
+# get user's comment
+@app.route("/comment", methods=['POST'])
 @login_required
 @verification_required
 def comment():
-    if request.method == 'POST':
-        if not request.form.get('comment'):
-            return render_template('alert.html', message='Make sure you filled out all required field(s)!')
-        comment = request.form.get('comment')
-        location = request.form.get('location')
-        comments = Comment(username=session['username'], text=comment, location=location)
-        db.session.add(comments)
-        db.session.commit()
-        return redirect("/books/read/" + location)
-    else:
-        return render_template('alert.html', message="You can't make comment via this route, please find a specific page or post to make comment to.")
 
-@app.route('/rating', methods=['GET', 'POST'])
+    # check for required information
+    if not request.form.get('comment'):
+        return render_template('alert.html', message='Make sure you filled out all required field(s)!')
+
+    # Get comment and add to database
+    comment = request.form.get('comment')
+    location = request.form.get('location')
+    comments = Comment(username=session['username'], text=comment, location=location)
+    db.session.add(comments)
+    db.session.commit()
+    return redirect("/books/read/" + location)
+
+
+# user submit rating
+@app.route('/rating', methods=['POST'])
 @login_required
 @verification_required
 def rating():
-    if request.method == 'POST':
-        if not request.form.get('rating'):
-            return render_template('alert.html', message='Make sure you filled out all required field(s)!')
-        rating = request.form.get('rating')
-        location = request.form.get('location')
-        ratingDb = Book.query.filter_by(title=location).first()
-        if ratingDb.rating == "No rating":
-            ratingDb.rating = rating
-            db.session.commit()
-            return render_template('success.html', message='success rating')
-        else:
-            ratingInDb = float(ratingDb.rating)
-            newRating = (ratingInDb + float(rating)) / 2;
-            ratingDb.rating = newRating
-            db.session.commit()
-            return render_template('success.html', message='success rating', link="/books/read/" + location)
-    else:
-        return render_template('alert.html', message='None')
 
+    # Check for required fields
+    if not request.form.get('rating'):
+        return render_template('alert.html', message='Make sure you filled out all required field(s)!')
+
+    # Query rating
+    rating = request.form.get('rating')
+    location = request.form.get('location')
+    ratingDb = Book.query.filter_by(title=location).first()
+
+    # ?
+    if ratingDb.rating == "No rating":
+        ratingDb.rating = rating
+        db.session.commit()
+        return render_template('success.html', message='success rating')
+    else:
+        ratingInDb = float(ratingDb.rating)
+        newRating = (ratingInDb + float(rating)) / 2
+        ratingDb.rating = newRating
+        db.session.commit()
+        return render_template('success.html', message='success rating', link="/books/read/" + location)
+
+
+# profile information
 @app.route('/profile')
 @login_required
 def profile():
     return render_template('profile.html')
 
+
+# user can edit their username
 @app.route('/profile/username', methods=['POST'])
 def change_username():
     email = session['email']
@@ -497,9 +706,12 @@ def change_username():
     email = user.email
     db.session.commit()
     session['username'] = new_username
-    send_email(email, "IMPORTANT: YOUR USERNAME CHANGED", "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its USERNAME.")
+    send_email(email, "IMPORTANT: YOUR USERNAME CHANGED",
+               "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its USERNAME.")
     return render_template('success.html', message='username changed success.')
 
+
+# user can edit their password
 @app.route('/profile/password', methods=['POST'])
 def change_password():
     username = request.form.get('username')
@@ -512,9 +724,12 @@ def change_password():
     user.password = pwHash
     db.session.commit()
     email = user.email
-    send_email(email, "IMPORTANT: YOUR PASSWORD CHANGED", "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its password.")
+    send_email(email, "IMPORTANT: YOUR PASSWORD CHANGED",
+               "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its password.")
     return render_template('success.html', message='password changed success.')
 
+
+# user can edit their email
 @app.route('/profile/email', methods=['POST'])
 def change_email():
     username = request.form.get('username')
@@ -525,16 +740,21 @@ def change_email():
     user.verification = verificationCode
     db.session.commit()
     session['verification'] = 'no'
-    send_email(new_email, "Verify your Saltie Nation Account!", "Click following link to access " + "https://boyuanliu6.pythonanywhere.com/verification/" + verificationCode)
-    send_email(new_email, "IMPORTANT: YOUR EMAIL CHANGED", "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its email address.")
+    send_email(new_email, "Verify your Saltie Nation Account!", "Click following link to access " +
+               "https://boyuanliu6.pythonanywhere.com/verification/" + verificationCode)
+    send_email(new_email, "IMPORTANT: YOUR EMAIL CHANGED",
+               "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its email address.")
     return render_template('success.html', message="Email changed success, check your email for verification.")
 
+
+# see all admin posts
 @app.route('/admin/post/all')
 def post_all():
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
         return render_template('alert.html', message="403 FORBIDDENED")
     posts = Post.query.all()
     return render_template('admin-post-all.html', posts=posts)
+
 
 @app.route('/admin/post/delete', methods=['GET'])
 def post_delete():
@@ -547,6 +767,7 @@ def post_delete():
     db.session.commit()
     return render_template('success.html', message="Success!", link="/admin/post/all")
 
+
 @app.route('/admin/comment/all')
 @login_required
 def comment_all():
@@ -554,6 +775,7 @@ def comment_all():
         return render_template('alert.html', message="403 FORBIDDENED")
     comments = Comment.query.all()
     return render_template('admin-comment-all.html', comments=comments)
+
 
 @app.route('/admin/comment/delete', methods=['GET'])
 def comment_delete():
@@ -566,6 +788,7 @@ def comment_delete():
     db.session.commit()
     return redirect('/admin/comment/all')
 
+
 @app.route('/admin/error/all')
 def error_all():
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
@@ -573,17 +796,21 @@ def error_all():
     errors = Error.query.all()
     return render_template('admin-error-all.html', errors=errors)
 
-@app.route('/feedback')
-def feedback():
-    return render_template('feedback.html')
 
 @app.route('/google2cea6360674968aa.html')
 def google_site_verification():
     return render_template('google2cea6360674968aa.html')
 
-google_blueprint = make_google_blueprint(client_id='18763142059-1ujrgntne9mrimdi9cu2rg69hfjtqt3k.apps.googleusercontent.com', client_secret='yZ2Jm66hECA6cW42TaHXEmp9', scope=['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile', 'openid'])
-app.register_blueprint(google_blueprint, url_prefix='/google_login')
 
+@app.route('/term')
+def term():
+    return render_template('term.html')
+
+
+google_blueprint = make_google_blueprint(client_id='18763142059-1ujrgntne9mrimdi9cu2rg69hfjtqt3k.apps.googleusercontent.com', client_secret='yZ2Jm66hECA6cW42TaHXEmp9',
+                                         scope=['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile', 'openid'])
+app.register_blueprint(google_blueprint, url_prefix='/google_login')
+# Google login
 @app.route('/google')
 def google_login():
     if not google.authorized:
@@ -592,9 +819,6 @@ def google_login():
     assert resp.ok, resp.text
     return redirect('/')
 
-@app.route('/term')
-def term():
-    return render_template('term.html')
 
 @oauth_authorized.connect_via(google_blueprint)
 def google_authorized(blueprint, token):
@@ -626,6 +850,7 @@ def google_authorized(blueprint, token):
     session['email'] = email
     session['verification'] = 'verified'
     return redirect('/')
+
 
 @app.route('/admin/send-email', methods=['GET', 'POST'])
 @admin_required

@@ -3,10 +3,6 @@ from functools import wraps
 import string
 import smtplib
 import random
-try:
-    from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
 
 # Set up API
 def login_required(f):
