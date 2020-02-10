@@ -5,4 +5,3 @@ tempfile
 Flask-SQLAlchemy
 SQLAlchemy
 Flask-Dance
-functools
