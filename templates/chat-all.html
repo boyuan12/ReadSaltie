@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Chat: All Channels
+{% endblock %}
+
+{% block main %}
+    <h1>All Channels Available: </h1>
+    {% for channels in channel_list %}
+        <li><a href="/chat/channel/{{ channels }}">{{ channels }}</a></li>
+    {% endfor %}
+{% endblock %}

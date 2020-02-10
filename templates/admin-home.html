@@ -1,0 +1,20 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    Edit Homepage
+{% endblock %}
+
+{% block main %}
+    <h1>Event Publisher</h1>
+    <p>Direction for publishing:
+        <ol>
+            <li>Create a file</li>
+            <li>Download the file</li>
+            <li>Add the file</li>
+        </ol>
+    </p>
+    <form action="/admin/add-file" method="post" enctype="multipart/form-data">
+        Add your file here: <input type="file" name="file" required>
+        <button type="submit">Submit</button>
+    </form>
+{% endblock %}

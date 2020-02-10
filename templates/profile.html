@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Profile
+{% endblock %}
+
+{% block main %}
+    <h2>Profile Page</h2>
+    <h4>Username</h4>
+    <p>Your username: <b>{{ session['username'] }}</b></p>
+    <form action="/profile/username" method='post'>
+        <input type="hidden" name="old_username" value="{{ session['username' ]}}">
+        <input type="text" name="new_username" required>
+        <button type="submit">Change Username</button>
+    </form>
+    <hr>
+    {% if session['oauth'] != 'Google' %}
+        <h4>Password</h4>
+        <p>Update your password</p>
+        <form action="/profile/password" method='post'>
+            <input type="hidden" name="username" value="{{ session['username'] }}">
+            <input type="password" name="new_password" required>
+            <input type="password" name="new_password_confirmation" required>
+            <button type="submit">Change Password</button>
+        </form>
+        <hr>
+        <h4>Email</h4>
+        <form action="/profile/email" method="post">
+            <p>Your username: <b>{{ session['email'] }}</b></p>
+            <input type="hidden" name="username" value="{{ session['username'] }}">
+            <input type="email" name="new_email">
+            <button type="submit">Change Email</button>
+        </form>
+    {% else %}
+        <h3 style="color: red">Sorry, since this is an google account, you can't change email and password.</h3>
+    {% endif %}
+{% endblock %}

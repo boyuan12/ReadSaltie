@@ -1,0 +1,26 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    All Comment
+{% endblock %}
+
+{% block main %}
+    <table>
+        <tr>
+            <th>id</th>
+            <th>username</th>
+            <th>text</th>
+            <th>location</th>
+            <th>DELETE LINK</th>
+        </tr>
+        {% for comment in comments %}
+            <tr>
+                <td>{{ comment.id }}</td>
+                <td>{{ comment.username }}</td>
+                <td>{{ comment.text }}</td>
+                <td>{{ comment.location }}</td>
+                <td><a href='/admin/comment/delete?id={{ comment.id }}'>delete</a></td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Headline
+{% endblock %}
+
+{% block main %}
+    <h1>Read the Hottest Headlines!</h1>
+      {% for post in posts %}
+        <h3>{{ post.username|safe }} published on {{ post.timestamp }}</h3>
+        <p>{{ post.contents|safe }}</p>
+      {% endfor %}
+{% endblock %}

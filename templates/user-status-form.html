@@ -1,0 +1,16 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    Modify Users
+{% endblock %}
+
+{% block main %}
+    <form action="/admin/modify" method="POST">
+        <input type="number" name="id" min=1 placeholder="id">
+        <input type="radio" name="status" value="admin"> admin<br>
+        <input type="radio" name="status" value="user"> user<br>
+        <input type="radio" name="status" value="staff"> staff <br>
+        Include job of staff (generalist OR user manager): <input type="text" name="identifier" value="staff">
+        <button type="submit">MODIFY STATUS</button>
+    </form>
+{% endblock %}

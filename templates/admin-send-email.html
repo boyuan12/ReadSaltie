@@ -1,0 +1,40 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    Admin Send Email
+{% endblock %}
+
+{% block main %}
+    <h1>Send Email</h1><br>
+    <form action="/admin/send-email" method="POST" id="email-form">
+        <input type="email" name="email" id="email-info"><br>
+        Or send by groups: <input type="checkbox" name="admin" id="email">admin <input type="checkbox" name="admin">staff <input type="checkbox" name="admin">user <input type="checkbox" name="admin">everyone<br>
+        Subject: <input type="text" name="subject">
+        Body: <input type="text" name="body">
+        <button type="submit">Send Email</button>
+    </form>
+    <div id="result"></div>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script>
+        $(document).ready(function(){
+            $('#email-form').on('input', function(event) {
+              $.ajax({
+                data: {
+                  info: $('#email-info').val()
+                },
+                type: "GET",
+                url: "/admin-api/v1/user-info"
+              })
+
+              .done(function(data){
+                if (data.error) {
+                  $('#result').text(data.error).show();
+                } else {
+                  $('#result').text(data.title).show();
+                }
+              });
+              event.preventDefault();
+            });
+        });
+    </script>
+{% endblock %}

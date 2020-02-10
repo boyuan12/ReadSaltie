@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Chat: Create Channel
+{% endblock %}
+
+{% block main %}
+    <form action="/chat/create" method="POST">
+        <label>Enter Your Channel Name: </label>
+        <input type="text" name="channel-name">
+        <button type="submit">Submit</button>
+    </form>
+
+{% endblock %}

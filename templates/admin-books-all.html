@@ -1,0 +1,27 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    All Books
+{% endblock %}
+
+{% block main %}
+    <h2>All Books</h2>
+    <table>
+        <tr>
+            <th>id</th>
+            <th>Username</th>
+            <th>Title</th>
+            <th>rating</th>
+            <th>delete link</th>
+        </tr>
+    {% for book in books %}
+        <tr>
+            <td>{{ book.id }}</td>
+            <td>{{ book.username }}</td>
+            <td>{{ book.title }}</td>
+            <td>{{ book.rating }}</td>
+            <td><a href='/admin/books/delete?book={{ book.id }}'>delete</a></td>
+        </tr>
+    {% endfor %}
+    </table>
+{% endblock %}

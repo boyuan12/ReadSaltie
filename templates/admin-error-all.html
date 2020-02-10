@@ -1,0 +1,24 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    All Errors
+{% endblock %}
+
+{% block main %}
+    <table>
+        <tr>
+            <th>id</th>
+            <th>location</th>
+            <th>method</th>
+            <th>detail</th>
+        </tr>
+        {% for error in errors %}
+            <tr>
+                <td>{{ error.id }}</td>
+                <td>{{ error.location }}</td>
+                <td>{{ error.method }}</td>
+                <td>{{ error.detail }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock %}

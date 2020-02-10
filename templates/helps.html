@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Help Me!
+{% endblock %}
+
+{% block main %}
+    <ul>
+        {% for error in resp %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

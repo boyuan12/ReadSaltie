@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Chat: Channel
+{% endblock %}
+
+{% block main %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
+    <script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <form id="messageForm">
+        <input type="text" id="message">
+        <button type="submit" id="sendMessageButton">Send</button>
+        <input type='hidden' value="{{ session['username'] }}" id='username'>
+    </form>
+    <ul id="messages">
+        {% for i in message_history %}
+            <li>{{ i.split(",")[1] }}: <b>{{ i.split(",")[0] }}</b><br><i>at {{ i.split(",")[2] }}</i> (history) <hr></li>
+        {% endfor %}
+    </ul>
+    <!-- The core Firebase JS SDK is always required and must be listed first -->
+<script src="https://www.gstatic.com/firebasejs/7.6.0/firebase-app.js"></script>
+
+<!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+<!--<script src="https://www.gstatic.com/firebasejs/7.6.0/firebase-analytics.js"></script>-->
+
+<script src="/__/firebase/7.6.0/firebase-app.js"></script>
+<script src="/__/firebase/7.6.0/firebase-messaging.js"></script>
+<script src="/__/firebase/init.js"></script>
+
+<script>
+  // Your web app's Firebase configuration
+  var firebaseConfig = {
+    apiKey: "AIzaSyC4sEHRl6RQwcYtlIKf0kpp28daT8-n6fc",
+    authDomain: "saltie-nation.firebaseapp.com",
+    databaseURL: "https://saltie-nation.firebaseio.com",
+    projectId: "saltie-nation",
+    storageBucket: "saltie-nation.appspot.com",
+    messagingSenderId: "18763142059",
+    appId: "1:18763142059:web:6043749286ef97c82c38ee",
+    measurementId: "G-REE1VZBG97"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  // firebase.analytics();
+</script>
+<script>
+    const messaging = firebase.messaging();
+    messaging.requestPermission()
+    .then(function() {
+        console.log('Have Permission')
+    })
+    .catch(function(err) {
+        console.log('Error')
+    })
+</script>
+{% endblock %}

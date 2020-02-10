@@ -1,0 +1,47 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    Users Management
+{% endblock %}
+
+{% block main %}
+    <table>
+        <tr>
+            <th>id</th>
+            <th>email</th>
+            <th>username</th>
+            <th>status</th>
+        </tr>
+    {% for i in users %}
+        {% if i.status == 'admin' %}
+        <tr style="color:green;">
+                <td>{{ i.id }}</td>
+                <td>{{ i.email }}</td>
+                <td>{{ i.username }}</td>
+                <td>{{ i.status }}</td>
+        </tr>
+        {% elif i.status == "staff-(generalist)" or i.status == "staff-(user manager)" %}
+            <tr style="color: blue;">
+                <td>{{ i.id }}</td>
+                <td>{{ i.email }}</td>
+                <td>{{ i.username }}</td>
+                <td>{{ i.status }}</td>
+            </tr>
+        {% elif i.status == "banned" %}
+            <tr style="color: red;">
+                <td>{{ i.id }}</td>
+                <td>{{ i.email }}</td>
+                <td>{{ i.username }}</td>
+                <td>{{ i.status }}</td>
+            </tr>
+        {% else %}
+            <tr style="color: black;">
+                <td>{{ i.id }}</td>
+                <td>{{ i.email }}</td>
+                <td>{{ i.username }}</td>
+                <td>{{ i.status }}</td>
+            </tr>
+        {% endif %}
+    {% endfor %}
+    </table>
+{% endblock %}

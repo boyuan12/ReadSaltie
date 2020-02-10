@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block main %}
+    <h3>Add Books</h3>
+    <p>Directions:</p>
+    <ol>
+        <li>Go to your Google Document</li>
+        <li>Click on "File" Tab</li>
+        <li>Choose "Publish to the web"</li>
+        <li>Click "Embed"</li>
+        <li>Click "Publish" button</li>
+        <li>Click "OK"</li>
+        <li>Copy the code</li>
+        <li>Add <code>width="1000" height="1000" frameborder="0"</code>.
+            <br>
+            Example <code>&ltiframe src="..." width="1000" height="1000" frameborder="0"&gt&lt/iframe&gt</code>
+        </li>
+    </ol>
+    <form action='/books/add' method='post' enctype="multipart/form-data" id="add-book">
+        <div class="input-group">
+            Title: <input type="text" name="title" class="form-control" aria-label="title" aria-describedby="basic-addon1" required>
+        </div>
+        <div class="input-group">
+            Description: <input type="text" name="description" class="form-control" aria-label="description" aria-describedby="basic-addon1" required>
+        </div>
+        <div class="custom-file">
+            <input type="file" class="custom-file-input" id="customFileLang" lang="en" required>
+            <label class="custom-file-label" for="customFileLang">Select Image to Upload</label>
+        </div>
+        <div class="input-group">
+            Embed Code: <input type="text" name="embed" class="form-control" aria-label="description" aria-describedby="basic-addon1"  id="embed" required>
+        </div>
+        <button type='submit' class="btn btn-primary">Submit</button>
+    </form>
+{% endblock %}

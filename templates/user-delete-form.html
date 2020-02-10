@@ -1,0 +1,14 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    Delete User
+{% endblock %}
+
+{% block main %}
+    <h4>You must know the user's id number before you can delete it. Also, delete a user is permenent, YOU CAN'T REDO IT.</h4>
+    <form action="/admin/delete" method="POST">
+        <input type="number" name="id" min=1 placeholder="id" required>
+        Why? <textarea name="comment" required></textarea>
+        <button type="submit">DELETE</button>
+    </form>
+{% endblock %}

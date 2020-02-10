@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Success
+{% endblock %}
+
+{% block main %}
+    <div class="alert alert-success" role="alert">
+        <h4 class="alert-heading">Success</h4>
+        <p>{{ message }}</p>
+        <hr>
+        <p class="mb-0">{{ info }} <br> <a href="{{ link }}">Go back to previous page</a></p>
+    </div>
+{% endblock %}

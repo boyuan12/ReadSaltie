@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Book Searched:
+{% endblock %}
+
+{% block main %}
+    <form action='/books' method='GET'>
+        <label>Search By Title</label>
+        <input type="text" name='title'>
+        <button type='submit'>Search</button>
+        <hr>
+    </form>
+    <div class="container">
+        {% for book in books %}
+            <!--{{ book.embedCode|safe }}-->
+              <div class="row">
+                <div class="col-9"><h2><a href="/books/read/{{ book.title }}">{{ book.title }}</a></h2></div>
+                <div class="col-4">
+                    <img src="{{ url_for('static', filename=book.image_name) }}" width="120"> <br>
+                    <p>Rating: {{ '%0.2f' % book.rating | float }} / 5</p>
+                </div>
+                <div class="col-6">
+                    <p>{{ book.description }}</p> <br>
+                    <p>Published By: {{ book.username }}</p>
+                    <p>Published on: {{ book.timestamp }}</p>
+                </div>
+            </div>
+            <hr>
+        {% endfor %}
+    </div>
+{% endblock %}

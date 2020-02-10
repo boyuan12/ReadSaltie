@@ -1,0 +1,48 @@
+{% extends 'layout.html' %}
+
+{% block title %}
+    Chat
+{% endblock %}
+
+{% block main %}
+  <!-- Insert these scripts at the bottom of the HTML, but before you use any Firebase services -->
+
+  <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+  <script src="https://www.gstatic.com/firebasejs/7.6.1/firebase-app.js"></script>
+
+  <!-- If you enabled Analytics in your project, add the Firebase SDK for Analytics -->
+  <script src="https://www.gstatic.com/firebasejs/7.6.1/firebase-analytics.js"></script>
+
+  <!-- Add Firebase products that you want to use -->
+  <script src="https://www.gstatic.com/firebasejs/7.6.1/firebase-messaging.js"></script>
+
+  <script>
+  // Your web app's Firebase configuration
+  var firebaseConfig = {
+    apiKey: "AIzaSyC4sEHRl6RQwcYtlIKf0kpp28daT8-n6fc",
+    authDomain: "saltie-nation.firebaseapp.com",
+    databaseURL: "https://saltie-nation.firebaseio.com",
+    projectId: "saltie-nation",
+    storageBucket: "saltie-nation.appspot.com",
+    messagingSenderId: "18763142059",
+    appId: "1:18763142059:web:6043749286ef97c82c38ee",
+    measurementId: "G-REE1VZBG97"
+  };
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+
+  const messaging = firebase.messaging();
+  messaging.requestPermission()
+  .then(function(){
+      console.log('Have permission');
+      return messaging.getToken();
+  })
+  .then(function(token) {
+      console.log(token)
+  })
+  .catch(function(err) {
+      console.log('Error');
+  })
+</script>
+
+{% endblock %}
