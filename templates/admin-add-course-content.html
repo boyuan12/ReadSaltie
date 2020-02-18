@@ -1,0 +1,14 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    Add Course Content
+{% endblock %}
+
+{% block main %}
+    <h1>Add Course Content</h1>
+    <form action="/admin/add-course-content" method="POST">
+        Course id: <input type="number" name="course_id" required> <br>
+        Contents (support HTML and AsciiMath Markup): <textarea name="contents"></textarea>
+        <button type="submit">Add new course content</button>
+    </form>
+{% endblock %}

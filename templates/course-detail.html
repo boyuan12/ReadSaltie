@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Course Detail
+{% endblock %}
+
+{% block main %}
+
+    {% for detail in courses %}
+        <p>{{ detail.contents|safe }}</p>
+        <hr>
+    {% endfor %}
+
+{% endblock %}

@@ -9,39 +9,69 @@
         <meta name="description" content="Dev. Version of future readsaltie.com. A place where you can read and publish book, share you comment, and support us to protect salties globalwide">
         <title>{% block title %}{% endblock %}</title>
         <meta name="detectify-verification" content="4f14217e44b3bb52c07bbd2060b5411a" />
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3.0.0/es5/tex-mml-chtml.js"></script>
     </head>
     <body>
         <h1>Rise Up Salties!!!</h1>
         <nav class="navbar navbar-light bg-light">
             <a class="navbar-brand" href="#">
                 <img src="/static/logo.png" width="30" height="30" class="d-inline-block align-top" alt="Flag/Logo">
-                    Get Saltie!!!
+                    ReadSaltie
             </a>
             {% if session.user_id %}
                 <h4>Welcome, {{ session.username }}, or <a href='/logout'>logout</a></h4>
+                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav mr-auto">
+                        <li class="nav-item active">
+                            <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+                        </li>
+                        <li class="nav-item active">
+                                <a class="nav-link" href="/profile">Profile <span class="sr-only">(current)</span></a>
+                        </li>
+                        <li class="nav-item active">
+                                <a class="nav-link" href="/music">Music <span class="sr-only">(current)</span></a>
+                        </li>
+                        <li class="nav-item active">
+                                <a class="nav-link" href="/books">Books <span class="sr-only">(current)</span></a>
+                        </li>
+                        <li class="nav-item active">
+                                <a class="nav-link" href="/courses">Courses <span class="sr-only">(current)</span></a>
+                        </li>
+                    </ul>
+                </div>
             {% else %}
-                <p>You didn't login yet, why don't <a href="/register">register</a>, <a href="/login">login</a>, or did you <a href="/forgotpassword">forgot password</a>?</p>
+                <p style="text-align:center">You didn't login yet, why don't <a href="/register">register</a>, <a href="/login">login</a>, or did you <a href="/forgotpassword">forgot password</a>?</p>
+                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav mr-auto">
+                        <li class="nav-item active">
+                            <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+                        </li>
+                        <li class="nav-item active">
+                                <a class="nav-link" href="/login">login <span class="sr-only">(current)</span></a>
+                        </li>
+                        <li class="nav-item active">
+                                <a class="nav-link" href="/register">register <span class="sr-only">(current)</span></a>
+                        </li>
+                        <li class="nav-item active">
+                                <a class="nav-link" href="/forgotpassword">forgot password <span class="sr-only">(current)</span></a>
+                        </li>
+                    </ul>
+                </div>
             {% endif %}
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item active">
-                        <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
-                    </li>
-                    <li class="nav-item active">
-                            <a class="nav-link" href="/headline">Headline <span class="sr-only">(current)</span></a>
-                    </li>
-                    <li class="nav-item active">
-                            <a class="nav-link" href="/music">Music <span class="sr-only">(current)</span></a>
-                    </li>
-                    <li class="nav-item active">
-                            <a class="nav-link" href="/books">Books <span class="sr-only">(current)</span></a>
-                    </li>
-                </ul>
-            </div>
         </nav>
+        {% for message in get_flashed_messages(with_categories=True) %}
+            <div class="alert alert-{{ message[0] }}">
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                {{ message[1] }}
+            </div>
+        {% endfor %}
         {% block main %}{% endblock %}
     </body>
 </html>

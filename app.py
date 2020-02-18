@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, render_template, session, request, redirect, url_for
+from flask import Flask, flash, render_template, session, request, redirect, url_for, abort
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 from tempfile import mkdtemp
@@ -25,6 +25,17 @@ app.config["SESSION_FILE_DIR"] = mkdtemp()
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
+
+maintenance_mode = False
+
+@app.before_request
+def check_for_maintenance():
+    if maintenance_mode:
+        abort(503)
+
+@app.errorhandler(503)
+def maintenance(error):
+    return '<h1>503 Under Maintenance</h1>Hello, this site is currently under maintenance right now, this time period will approximately end between 1-3hrs. If we need to extend that time, further notice will be displayed on this page. Thank you for your patience!', 503
 
 # securities
 @app.after_request
@@ -108,6 +119,24 @@ class Error(db.Model):
     detail = db.Column(db.Text)
 
 
+class Course(db.Model):
+
+    __tablename__ = "courses"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100))
+    description = db.Column(db.Text)
+
+
+class Course_Content(db.Model):
+
+    __tablename__ = "courses-contents"
+
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, db.ForeignKey("courses.id"))
+    contents = db.Column(db.Text)
+
+
 # Create all database
 db.create_all()
 
@@ -125,7 +154,8 @@ def register():
 
         # check for required fields are all filled in (in case js is disabled)
         if not request.form.get("username") or not request.form.get('password') or not request.form.get('email') or not request.form.get('confirmation'):
-            return render_template('alert.html', message="Make sure you filled out all required fields.")
+            flash("Make sure you filled out all required fields.", category='danger')
+            return redirect('/register')
 
         # Set up variables for later use
         email = request.form.get('email')
@@ -135,19 +165,22 @@ def register():
 
         # Check for password confirmation (in case js is disabled)
         if password != confirmation:
-            return render_template('alert.html', message='INCORRECT PASSWORD/CONFIRMATION')
+            flash('Incorrect password confirmation', category='danger')
+            return redirect('/register')
 
         # Check for username/email is already registered or not
         user = User.query.filter_by(username=username).first()
         userEmail = User.query.filter_by(email=email).first()
         try:
             if user.username == username:
-                return render_template('alert.html', message='Username already registered.')
+                flash('Username already exist, probably try forgot password.', category='danger')
+                return redirect('/register')
         except AttributeError:
             pass
         try:
             if userEmail.email == email:
-                return render_template('alert.html', message='Email Already Registered, maybe try to forgot password?')
+                flash('Email already exist, probably try forgot password.', category='danger')
+                return redirect('/register')
         except AttributeError:
             pass
 
@@ -185,11 +218,13 @@ def login():
 
         # Check and see if its valid info or not
         if not user:
-            return render_template('alert.html', message='Wrong Username')
+            flash('Wrong username', category='danger')
+            return redirect('/login')
         if user.password == '(Google)':
             return redirect('/google')
         if not check_password_hash(user.password, password):
-            return render_template('alert.html', message='Wrong Password')
+            flash('Wrong password', category='danger')
+            return redirect('/login')
 
         # Set up session, verification, etc.
         global user_id
@@ -227,7 +262,7 @@ def login():
 def admin_users():
     # check for valid status (only admin and staff-(generalist)) have right to access
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
-        return render_template('alert.html', message="403 FORBIDDENED")
+        abort(403)
 
     # get all the user from database and send it to admin-user.html
     all_rows = User.query.all()
@@ -240,7 +275,7 @@ def admin_users():
 def delete_user():
     # check for valid status (only admin can delete user)
     if session['status'] == 'user' or session['status'] == 'staff-(generalist)' or session['status'] == 'staff-(user manager)':
-        return render_template('alert.html', message="403 FORBIDDENED")
+        abort(403)
 
     if request.method == 'POST':
         # Get required information
@@ -268,7 +303,7 @@ def delete_user():
 def modify_user():
     # Check for valid status, only admin and staff-(generalist) can access
     if session['status'] == 'user' or session['status'] == 'staff-(generalist)':
-        return render_template('alert.html', message="403 FORBIDDENED")
+        abort(403)
 
     if request.method == 'POST':
         # Get required informations
@@ -294,7 +329,7 @@ def modify_user():
 def add_file():
     # check for valid status, only admin can access
     if session['status'] == 'user' or session['status'] == 'staff-(generalist)' or session['status'] == 'staff-(user manager)':
-        return render_template('alert.html', message="403 FORBIDDENED")
+        abort(403)
 
     if request.method == 'POST':
 
@@ -339,7 +374,8 @@ def verify(token):
 
     # except error if no token find
     except AttributeError:
-        return render_template('alert.html', message='NO TOKEN FOUND!')
+        flash('No forgot password token found. Is this the newest token or did you already clicked?', category='danger')
+        return redirect('/verification')
 
     # if token found, change user's status to verified
     if token in verificationDict:
@@ -349,9 +385,11 @@ def verify(token):
         user.verification = 'verified'
         db.session.commit()
         session['verification'] = 'verified'
-        return render_template('success.html', message='Verfied!')
+        flash('Your account is successfully verified!', category='success')
+        return redirect('/')
     else:
-        return render_template('alert.html', message='No Such Verfication String')
+        flash('No such verification string', category='danger')
+        return redirect('/verification')
 
 
 @app.route("/forgotpassword", methods=['GET', 'POST'])
@@ -365,7 +403,8 @@ def forgotpassword():
 
         # check for required field to fill out
         if not request.form.get('email'):
-            return render_template('alert.html', message="Please fill out all required fields")
+            flash('Please fill out all required field(s)', category='danger')
+            return redirect('/forgotpassword')
 
         # Generate a code that will send to user
         forgotPasswordCode = randomString(75)
@@ -376,11 +415,12 @@ def forgotpassword():
             user = User.query.filter_by(email=email)
             user_email = user.email
         except:
-            return render_template('alert.html', message="Email not found, is this right email address? Did you registered using this email address?")
+            flash('Email not found, is this right email address? Did you registered using this email address?', category='danger')
+            return redirect('/forgotpassword')
 
         # Add this to dict, and send email
         forgotPasswordDict.update({forgotPasswordCode: email})
-        send_email(email, 'Important! Request Password Change at Saltie National Broadcasting Channel', 'Important, someone request a password change for your account at Saltie National Broadcasting Channel. If you did, click followling link to reset your password: https://boyuanliu6.pythonanywhere.com/forgotpassword/' +
+        send_email(email, 'Important! Request Password Change at ReadSaltie', 'Important, someone request a password change for your account at Saltie National Broadcasting Channel. If you did, click followling link to reset your password: https://boyuanliu6.pythonanywhere.com/forgotpassword/' +
                    forgotPasswordCode + ' If you didn\'t request it, don\'t be worry, your password is still the same.')
         return render_template("success.html", message='Please check your email address for link to reset your password.')
     else:
@@ -413,9 +453,11 @@ def getnewpassword(token):
 
         # return if email isn't exist
         else:
-            return render_template('alert.html', message='Email address is not registered.')
+            flash('Error.', category='danger')
+            return redirect('/forgotpassword')
     else:
-        return render_template('alert.html', message='FORGOT PASSWORD TOKEN NOT FOUND!')
+        flash('Forgot password token not found.', category='danger')
+        return redirect('/forgotpassword')
 
 
 # route for user to enter new password
@@ -429,7 +471,8 @@ def new_password():
 
         # check see if password = confirmation
         if password != confirmation:
-            return render_template('alert.html', message='Confirmation must be same as new password')
+            flash('Password confirmation not correct', category='danger')
+            return redirect('/forgotpassword')
 
         # commit the change
         pwHash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
@@ -440,11 +483,11 @@ def new_password():
 
     else:
 
-        # try and see forgotEmail global var declared or not (based on /forgotpassword/...)
         try:
             return render_template('new-password.html', email=forgotEmail)
         except NameError:
-            return render_template('alert.html', message='System didn\'t found your email address, maybe try to do forgot password first?')
+            flash('System didn\'t found your email address, maybe try to do forgot password first?', category='danger')
+            return redirect('/forgotpassword')
 
 
 # 404 error handler
@@ -460,7 +503,7 @@ def internal_server_error(e):
     error = Error(location=request.url, method=request.method, detail=str(e.args))
     db.session.add(error)
     db.session.commit()
-    return render_template('alert.html', message='500 INTERNAL SERVER ERROR: This is SNBC Channel Staff. Sorry, we were expriencing some technical issues. Please Understand this site is under active development right now. Sorry.', info=str(e)), 500
+    return render_template('alert.html', message='500 INTERNAL SERVER ERROR: This is SNBC Channel Staff. Sorry, we were expriencing some technical issues. Please Understand this site is under active development right now. Sorry.', info=str(e.args)), 500
 
 
 # route for editing page
@@ -469,7 +512,7 @@ def edit_homepage():
 
     # check for valid status
     if session['status'] == 'user' or session['status'] == 'staff-(user manager)':
-        return render_template('alert.html', message="403 FORBIDDENED")
+        abort(403)
 
     if request.method == 'POST':
 
@@ -553,6 +596,8 @@ def book_add():
         title = request.form.get('title')
         titleDb = Book.query.filter_by(title=title).first()
 
+        if "?" in title:
+            return render_template('alert.html', message='Sorry, ? is restricted symbol. You may not publish any book with title that contains ?.')
         # Check whether the title already exist or not
         try:
             if titleDb.title == title:
@@ -575,6 +620,9 @@ def book_add():
         # Add special admin badge in author when its author is an admin
         if session['status'] == 'admin':
             book = Book(username=session['username'] + " (admin)", timestamp=timestamp,
+                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating')
+        elif session['status'] == 'staff':
+            book = Book(username=session['username'] + " (staff)", timestamp=timestamp,
                         title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating')
         else:
             book = Book(username=session['username'], timestamp=timestamp, title=title,
@@ -619,7 +667,10 @@ def admin_book_delete():
     id = request.args.get('book')
     book = Book.query.filter_by(id=id).first()
     image_name = book.image_name
-    os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image_name))
+    try:
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image_name))
+    except FileNotFoundError:
+        pass
     Book.query.filter(Book.id == id).delete(synchronize_session='evaluate')
     db.session.commit()
     return render_template('success.html', message='Delete Success', link="/admin/books/all")
@@ -894,3 +945,67 @@ def admin_send_email():
 
     else:
         return render_template('admin-send-email.html')
+
+
+@app.route('/admin/add-course', methods=['GET', 'POST'])
+@admin_required
+def add_course():
+
+    if request.method == 'POST':
+
+        course_name = request.form.get('course_name')
+        description = request.form.get('description')
+
+        course = Course(title=course_name, description=description)
+        db.session.add(course)
+        db.session.commit()
+
+        course_added = Course.query.filter_by(title=course_name).first()
+
+        send_email('longlivesaltienation@gmail.com', 'New Course Added on boyuanliu6.pythonanywhere.com', 'New course added, here is the detail information: <b>course id: {}, course title: {}</b>'.format(course_added.id, course_added.title))
+
+        return render_template('success.html', message='Course added successfully, your course id is: {}. Please remember this id number'.format(str(course_added.id)))
+
+    else:
+        return render_template('admin-add-course.html')
+
+@app.route('/admin/add-course-content', methods=['GET', 'POST'])
+@admin_required
+def add_course_content():
+
+    if request.method == 'POST':
+
+        contents = request.form.get('contents')
+        course_id = request.form.get('course_id')
+
+        course = Course_Content(course_id=course_id, contents=contents)
+        db.session.add(course)
+        db.session.commit()
+
+        return render_template('success.html', message='Course Content added successfully.')
+
+    else:
+        return render_template('admin-add-course-content.html')
+
+@app.route('/courses')
+@login_required
+def courses():
+
+    courses = Course.query.all()
+
+    return render_template('courses.html', courses=courses)
+
+@app.route('/course/<int:course_id>')
+@login_required
+def course_title(course_id):
+
+    courses = Course.query.join(Course_Content, Course.id==Course_Content.course_id).add_columns(Course.id, Course.title, Course_Content.contents).filter_by(course_id=course_id)
+
+    return render_template('course-detail.html', courses=courses)
+
+
+@app.route('/survey')
+@login_required
+def survey():
+
+    return render_template('survey.html')
