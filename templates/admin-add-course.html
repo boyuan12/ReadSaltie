@@ -8,7 +8,11 @@
     <h1>Add New Course</h1>
     <form action="/admin/add-course" method="POST">
         Course Title: <input type="text" name="course_name" required> <br>
-        Course Description: <textarea name="description"></textarea>
+        Course Description: <textarea name="description"></textarea><br>
+        Category:
+        <select name="category">
+            <option value="coding">Coding Course</option>
+        </select>
         <button type="submit">Create new course</button>
     </form>
 {% endblock %}

@@ -74,6 +74,12 @@ slider.oninput = function() {
   output.innerHTML = this.value;
 }
     </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script>
+        $.ajax({
+            url: "/books/{{ id }}/view/{{ randomString }}"
+        })
+    </script>
     <h4>All Comments Below:</h4>
     {% for comment in comments %}
         <p><b>{{ comment.username }}</b> says: <br></p>

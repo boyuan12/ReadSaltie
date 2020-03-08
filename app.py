@@ -1,12 +1,14 @@
 import os
+from datetime import date, timedelta
+import calendar
 
-from flask import Flask, flash, render_template, session, request, redirect, url_for, abort
+from flask import Flask, flash, render_template, session, request, redirect, url_for, abort, jsonify
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 from tempfile import mkdtemp
 import datetime
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import update, desc, text
+from sqlalchemy import update, desc, text, asc
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
 from static import *
@@ -26,12 +28,14 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-maintenance_mode = False
+maintenance_mode = True
 
 @app.before_request
 def check_for_maintenance():
     if maintenance_mode:
-        abort(503)
+        flash('Dear user, our website is currently being updated, there might be some errors happening. Thanks for your understanding.', category='warning')
+    else:
+        redirect(request.path)
 
 @app.errorhandler(503)
 def maintenance(error):
@@ -96,7 +100,9 @@ class Book(db.Model):
     description = db.Column(db.String(4096))
     image_name = db.Column(db.String(4096))
     embedCode = db.Column(db.Text)
+    contest = db.Column(db.String(10))
     rating = db.Column(db.String(10))
+    view = db.Column(db.Integer)
 
 
 class Comment(db.Model):
@@ -126,6 +132,7 @@ class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100))
     description = db.Column(db.Text)
+    category = db.Column(db.String(100))
 
 
 class Course_Content(db.Model):
@@ -136,6 +143,16 @@ class Course_Content(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey("courses.id"))
     contents = db.Column(db.Text)
 
+class Contest(db.Model):
+
+    __tablename__ = "contests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200))
+    description = db.Column(db.Text)
+    winner = db.Column(db.Text)
+    begin = db.Column(db.String(20))
+    end = db.Column(db.String(20))
 
 # Create all database
 db.create_all()
@@ -144,8 +161,34 @@ db.create_all()
 # Index route
 @app.route("/")
 def home():
+    my_date = date.today()
+    contest_id = abs(my_date - date(2020, 3, 8)).days // 7
+
+    if calendar.day_name[my_date.weekday()] == 'Sunday':
+
+        # check whether the contest exist
+        contest = Contest.query.filter_by(title='Weekly Contest #' + str(contest_id)).first()
+        try:
+            if contest.title == 'Weekly Contest #' + str(contest_id):
+                contest = Contest.query.filter_by(title='Weekly Contest #' + str(contest_id)).first()
+                posts = Post.query.filter_by(location='Event')
+                return render_template("index.html", posts=posts, contest=contest)
+        except AttributeError:
+            pass
+
+        # get most viewed book
+        view_book = Book.query.order_by(desc(Book.view)).first()
+
+        # get most rated book
+        rate_book = Book.query.order_by(desc(Book.rating)).first()
+
+        contest = Contest(title='Weekly Contest #{}'.format(contest_id), winner=view_book.title + ',' + view_book.username + ',' + rate_book.title + ',' + rate_book.username, begin=my_date, end=str(date.today() + timedelta(days=6)))
+        db.session.add(contest)
+        db.session.commit()
+
+    contest = Contest.query.filter_by(title='Weekly Contest #' + str(contest_id)).first()
     posts = Post.query.filter_by(location='Event')
-    return render_template("index.html", posts=posts)
+    return render_template("index.html", posts=posts, contest=contest)
 
 # register route
 @app.route("/register", methods=['GET', 'POST'])
@@ -613,20 +656,20 @@ def book_add():
         ts = datetime.datetime.now().timestamp()
         timestamp = datetime.datetime.fromtimestamp(ts).isoformat()
 
-        # Save file
+        # Save image
         file = request.files["image"]
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], file.filename))
 
         # Add special admin badge in author when its author is an admin
         if session['status'] == 'admin':
             book = Book(username=session['username'] + " (admin)", timestamp=timestamp,
-                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating')
+                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'))
         elif session['status'] == 'staff':
             book = Book(username=session['username'] + " (staff)", timestamp=timestamp,
-                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating')
+                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'))
         else:
             book = Book(username=session['username'], timestamp=timestamp, title=title,
-                        description=description, image_name=file.filename, embedCode=embed, rating='No rating')
+                        description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'))
 
         # Add book
         db.session.add(book)
@@ -677,21 +720,43 @@ def admin_book_delete():
 
 
 # Read a book
+viewRanList = [];
+
 @app.route('/books/read/<string:title>')
 def read_book(title):
 
     # find appropriate title based on route
     titleDb = Book.query.filter_by(title=title).all()
 
+    # generate random book string
+    random_str = randomString(75)
+    viewRanList.append(random_str)
+
     # Check for all title, see which one matches
     for titles in titleDb:
         if titles.title == title:
             comments = Comment.query.filter_by(location=title).all()
-            return render_template('book-read.html', embedCode=titles.embedCode, title=titles.title, comments=comments)
+            return render_template('book-read.html', id=titles.id, embedCode=titles.embedCode, title=titles.title, comments=comments, randomString=random_str)
 
     # Return this if no book found
     return render_template('alert.html', message='NOT FOUND')
 
+@app.route('/books/<int:book_id>/view/<string:random>')
+def add_view(book_id, random):
+
+    if random not in viewRanList:
+        return jsonify('Wrong Random String')
+
+    viewRanList.remove(random)
+
+    book = Book.query.filter_by(id=book_id).first()
+    try:
+        book.view += 1
+    except TypeError:
+        book.view = 1
+    db.session.commit()
+
+    return jsonify('success')
 
 # get user's comment
 @app.route("/comment", methods=['POST'])
@@ -857,10 +922,10 @@ def google_site_verification():
 def term():
     return render_template('term.html')
 
-
 google_blueprint = make_google_blueprint(client_id='18763142059-1ujrgntne9mrimdi9cu2rg69hfjtqt3k.apps.googleusercontent.com', client_secret='yZ2Jm66hECA6cW42TaHXEmp9',
                                          scope=['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile', 'openid'])
 app.register_blueprint(google_blueprint, url_prefix='/google_login')
+
 # Google login
 @app.route('/google')
 def google_login():
@@ -888,7 +953,12 @@ def google_authorized(blueprint, token):
             session['verification'] = userEmail.verification
             session['oauth'] = 'Google'
             session['verification'] = 'verified'
-            return redirect('/')
+            if userEmail.status == 'banned':
+                session.clear()
+                flash('Hello, you are temporaily banned from ReadSaltie, please wait for further notice. Thanks', category='danger')
+                return redirect('/')
+            else:
+                return redirect('/')
     except AttributeError:
         pass
     registrant = User(email=email, username=email, password="(Google)", status="user")
@@ -900,7 +970,10 @@ def google_authorized(blueprint, token):
     session['status'] = userAfter.status
     session['email'] = email
     session['verification'] = 'verified'
-    return redirect('/')
+    if userAfter.status == 'banned':
+        flash('Hello, you are temporaily banned from ReadSaltie, please wait for further notice. Thanks', category='danger')
+    else:
+        return redirect('/')
 
 
 @app.route('/admin/send-email', methods=['GET', 'POST'])
@@ -955,8 +1028,9 @@ def add_course():
 
         course_name = request.form.get('course_name')
         description = request.form.get('description')
+        category = request.form.get('category')
 
-        course = Course(title=course_name, description=description)
+        course = Course(title=course_name, description=description, category=category)
         db.session.add(course)
         db.session.commit()
 

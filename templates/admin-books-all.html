@@ -11,7 +11,8 @@
             <th>id</th>
             <th>Username</th>
             <th>Title</th>
-            <th>rating</th>
+            <th>Rating</th>
+            <th>View</th>
             <th>delete link</th>
         </tr>
     {% for book in books %}
@@ -20,6 +21,7 @@
             <td>{{ book.username }}</td>
             <td>{{ book.title }}</td>
             <td>{{ book.rating }}</td>
+            <td>{{ book.view }}</td>
             <td><a href='/admin/books/delete?book={{ book.id }}'>delete</a></td>
         </tr>
     {% endfor %}
