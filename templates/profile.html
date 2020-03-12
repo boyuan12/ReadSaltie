@@ -34,4 +34,29 @@
     {% else %}
         <h3 style="color: red">Sorry, since this is an google account, you can't change email and password.</h3>
     {% endif %}
+    <br>
+    <h4>Books Published</h4>
+    <div class="container">
+        {% for book in books %}
+          <div class="row">
+                <div class="col-9"><h2><a href="/books/read/{{ book.title }}">{{ book.title }}</a></h2></div>
+                <div class="col-4">
+                    <img src="{{ url_for('static', filename=book.image_name) }}" width="120"> <br>
+                    <p>Rating: {{ '%0.2f' % book.rating | float }} / 5</p>
+                </div>
+                <div class="col-6">
+                    <p>{{ book.description }}</p> <br>
+                    <p><a href="/profile/{{ session['username'] }}/delete/{{ book.id }}">delete this book</a></p>
+                    <p>Published on: {{ book.timestamp }}</p>
+                </div>
+            <hr>
+        {% endfor %}
+    </div>
+    <hr>
+    <h4>Following: </h4>
+    <ul>
+        {% for follow in following %}
+            <li><a href="/profile/{{ follow.username }}">{{ follow.username }}</a></li>
+        {% endfor %}
+    </ul>
 {% endblock %}

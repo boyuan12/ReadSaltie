@@ -1,6 +1,7 @@
 import os
 from datetime import date, timedelta
 import calendar
+import json
 
 from flask import Flask, flash, render_template, session, request, redirect, url_for, abort, jsonify
 from flask_session import Session
@@ -28,7 +29,7 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-maintenance_mode = True
+maintenance_mode = False
 
 @app.before_request
 def check_for_maintenance():
@@ -76,6 +77,7 @@ class User(db.Model):
     password = db.Column(db.String(4096))
     status = db.Column(db.String(4096))
     verification = db.Column(db.String(4096))
+    picture = db.Column(db.Text)
 
 
 class Post(db.Model):
@@ -153,6 +155,24 @@ class Contest(db.Model):
     winner = db.Column(db.Text)
     begin = db.Column(db.String(20))
     end = db.Column(db.String(20))
+
+class Follower(db.Model):
+
+    __tablename__ = "followers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    following_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    owner_id = db.Column(db.Integer)
+
+class Notification(db.Model):
+
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    to_id = db.Column(db.Integer)
+    message = db.Column(db.Text)
+    link = db.Column(db.Text)
+    status = db.Column(db.String(100))
 
 # Create all database
 db.create_all()
@@ -283,6 +303,13 @@ def login():
         session["username"] = username
         session['status'] = status
         session['email'] = user.email
+
+        notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+        notification_count = 0
+        for notification in notifications:
+            if notification.status == 'unread':
+                notification_count += 1
+        session['notification_count'] = notification_count
 
         # Check if user is temporary banned from website
         if 'banned' in status is not True:
@@ -674,6 +701,14 @@ def book_add():
         # Add book
         db.session.add(book)
         db.session.commit()
+
+        # Add Notification
+        followers = Follower.query.filter_by(following_id=session.get('user_id'))
+        for follower in followers:
+            notification = Notification(to_id=follower.owner_id, message='{} published a new book, called {}.'.format(session.get('username'), title), link="/books/read/{}".format(title), status='unread')
+            db.session.add(notification)
+            db.session.commit()
+
         return render_template('success.html', message='success', link="/books/read/" + title)
     else:
         return render_template('admin-books-add.html')
@@ -809,7 +844,17 @@ def rating():
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html')
+    if session.get('status') == 'admin':
+        books = Book.query.filter_by(username=session.get('username') + ' (admin)')
+    elif session.get('status') == 'staff':
+        books = Book.query.filter_by(username=session.get('username') + ' (staff)')
+    else:
+        books = Book.query.filter_by(username=session.get('username'))
+
+    # courses = Course.query.join(Course_Content, Course.id==Course_Content.course_id).add_columns(Course.id, Course.title, Course_Content.contents).filter_by(course_id=course_id)
+    following = Follower.query.join(User, Follower.following_id == User.id).add_columns(User.username).filter(Follower.owner_id == session.get('user_id'))
+
+    return render_template('profile.html', books=books, following=following)
 
 
 # user can edit their username
@@ -862,6 +907,18 @@ def change_email():
                "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its email address.")
     return render_template('success.html', message="Email changed success, check your email for verification.")
 
+@app.route('/profile/<string:username>/delete/<int:book_id>')
+@login_required
+def profile_delete_book(username, book_id):
+
+    if session.get('username') != username:
+        abort(403)
+
+    Book.query.filter(Book.id == book_id).delete(synchronize_session='evaluate')
+    db.session.commit()
+
+    flash('Delete Success', category='success')
+    return redirect(url_for('profile'))
 
 # see all admin posts
 @app.route('/admin/post/all')
@@ -941,6 +998,7 @@ def google_authorized(blueprint, token):
     resp = google.get("/oauth2/v1/userinfo")
     assert resp.ok, resp.text
     email = resp.json()['email']
+    image = resp.json()['picture']
     if resp.json()['verified_email'] != True:
         return render_template('alert.html', message='You must verify your Google Account\' email first.')
     userEmail = User.query.filter_by(email=email).first()
@@ -953,6 +1011,12 @@ def google_authorized(blueprint, token):
             session['verification'] = userEmail.verification
             session['oauth'] = 'Google'
             session['verification'] = 'verified'
+            notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+            notification_count = 0
+            for notification in notifications:
+                if notification.status == 'unread':
+                    notification_count += 1
+            session['notification_count'] = notification_count
             if userEmail.status == 'banned':
                 session.clear()
                 flash('Hello, you are temporaily banned from ReadSaltie, please wait for further notice. Thanks', category='danger')
@@ -961,7 +1025,7 @@ def google_authorized(blueprint, token):
                 return redirect('/')
     except AttributeError:
         pass
-    registrant = User(email=email, username=email, password="(Google)", status="user")
+    registrant = User(email=email, username=email, password="(Google)", status="user", picture=image)
     db.session.add(registrant)
     db.session.commit()
     userAfter = User.query.filter_by(email=email).first()
@@ -970,9 +1034,16 @@ def google_authorized(blueprint, token):
     session['status'] = userAfter.status
     session['email'] = email
     session['verification'] = 'verified'
+    session['oauth'] = 'Google'
     if userAfter.status == 'banned':
         flash('Hello, you are temporaily banned from ReadSaltie, please wait for further notice. Thanks', category='danger')
     else:
+        notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+        notification_count = 0
+        for notification in notifications:
+            if notification.status == 'unread':
+                notification_count += 1
+        session['notification_count'] = notification_count
         return redirect('/')
 
 
@@ -1083,3 +1154,59 @@ def course_title(course_id):
 def survey():
 
     return render_template('survey.html')
+
+
+@app.route('/profile/<string:username>')
+@login_required
+def public_profile(username):
+
+    user = User.query.filter_by(username=username).first()
+
+    try:
+        username = user.username
+    except:
+        abort(404)
+
+    if user.status == 'admin':
+        books = Book.query.filter_by(username=username + " (admin)")
+    elif user.status == 'staff':
+        books = Book.query.filter_by(username=username + " (staff)")
+    else:
+        books = Book.query.filter_by(username=username)
+
+    return render_template('public-profile.html', user=user, books=books)
+
+
+@app.route('/follow/<int:user_id>')
+@login_required
+def follow(user_id):
+
+    users = Follower.query.filter_by(owner_id=session.get('user_id'))
+    for user in users:
+        if user.following_id == user_id:
+            return render_template('alert.html', message='Already Followed')
+
+    if user_id == session.get('user_id'):
+        return render_template('alert.html', message='You can\'t follow yourself.')
+
+    follower = Follower(following_id=user_id, owner_id=session.get('user_id'))
+    db.session.add(follower)
+    db.session.commit()
+
+    return render_template('success.html', message='Follow Success')
+
+
+@app.route('/notifications')
+@login_required
+def notification():
+
+    notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+
+    for notification in notifications:
+        notification.status == 'read'
+        db.session.commit()
+
+    return render_template('notifications.html', notifications=notifications)
+
+
+

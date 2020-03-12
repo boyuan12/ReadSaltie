@@ -33,7 +33,7 @@
         } );
 
     function htmlButton() {
-        var htmlContent = document.getElementById('editor').innerHTML;
+        var htmlContent = $('#editor').html();
         var y = document.createElement('FORM');
         y.setAttribute("action", "/admin/edit/homepage");
         y.setAttribute("method", "post");
