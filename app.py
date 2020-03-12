@@ -15,7 +15,7 @@ from static import *
 
 # Configure basic app information
 app = Flask(__name__, static_url_path='/static')
-UPLOAD_FOLDER = "/home/boyuanliu6/saltie-nation/static"
+UPLOAD_FOLDER = "/home/readsaltie/ReadSaltie/static"
 app.secret_key = "secret key"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -29,11 +29,10 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 maintenance_mode = True
-
 @app.before_request
 def check_for_maintenance():
     if maintenance_mode:
-        flash('Dear user, our website is currently being updated, there might be some errors happening. Thanks for your understanding.', category='warning')
+        abort(503)
     else:
         redirect(request.path)
 
@@ -53,10 +52,10 @@ def after_request(response):
 
 # Set up SQLAlchemy Connection
 SQLALCHEMY_DATABASE_URI = "mysql+mysqlconnector://{username}:{password}@{hostname}/{databasename}".format(
-    username="boyuanliu6",
-    password="database",
-    hostname="boyuanliu6.mysql.pythonanywhere-services.com",
-    databasename="boyuanliu6$database",
+    username="readsaltie",
+    password="databaseforrs",
+    hostname="readsaltie.mysql.pythonanywhere-services.com",
+    databasename="readsaltie$default",
 )
 app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
 app.config["SQLALCHEMY_POOL_RECYCLE"] = 299
@@ -238,7 +237,7 @@ def register():
 
         # Send email (see static.py for send_email function definition)
         send_email(email, "Verify your Saltie Nation Account!", "Click following link to access " +
-                   "https://boyuanliu6.pythonanywhere.com/verification/" + verificationCode)
+                   "https://readsaltie.pythonanywhere.com/verification/" + verificationCode)
 
         # return user to login route and login
         return redirect("/login")
@@ -463,7 +462,7 @@ def forgotpassword():
 
         # Add this to dict, and send email
         forgotPasswordDict.update({forgotPasswordCode: email})
-        send_email(email, 'Important! Request Password Change at ReadSaltie', 'Important, someone request a password change for your account at Saltie National Broadcasting Channel. If you did, click followling link to reset your password: https://boyuanliu6.pythonanywhere.com/forgotpassword/' +
+        send_email(email, 'Important! Request Password Change at ReadSaltie', 'Important, someone request a password change for your account at Saltie National Broadcasting Channel. If you did, click followling link to reset your password: https://readsaltie.pythonanywhere.com/forgotpassword/' +
                    forgotPasswordCode + ' If you didn\'t request it, don\'t be worry, your password is still the same.')
         return render_template("success.html", message='Please check your email address for link to reset your password.')
     else:
@@ -823,7 +822,7 @@ def change_username():
     db.session.commit()
     session['username'] = new_username
     send_email(email, "IMPORTANT: YOUR USERNAME CHANGED",
-               "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its USERNAME.")
+               "Hello, your account at https://readsaltie.pythonanywhere.com has just changed its USERNAME.")
     return render_template('success.html', message='username changed success.')
 
 
@@ -841,7 +840,7 @@ def change_password():
     db.session.commit()
     email = user.email
     send_email(email, "IMPORTANT: YOUR PASSWORD CHANGED",
-               "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its password.")
+               "Hello, your account at https://readsaltie.pythonanywhere.com has just changed its password.")
     return render_template('success.html', message='password changed success.')
 
 
@@ -857,9 +856,9 @@ def change_email():
     db.session.commit()
     session['verification'] = 'no'
     send_email(new_email, "Verify your Saltie Nation Account!", "Click following link to access " +
-               "https://boyuanliu6.pythonanywhere.com/verification/" + verificationCode)
+               "https://readsaltie.pythonanywhere.com/verification/" + verificationCode)
     send_email(new_email, "IMPORTANT: YOUR EMAIL CHANGED",
-               "Hello, your account at https://boyuanliu6.pythonanywhere.com has just changed its email address.")
+               "Hello, your account at https://readsaltie.pythonanywhere.com has just changed its email address.")
     return render_template('success.html', message="Email changed success, check your email for verification.")
 
 
@@ -922,7 +921,7 @@ def google_site_verification():
 def term():
     return render_template('term.html')
 
-google_blueprint = make_google_blueprint(client_id='18763142059-1ujrgntne9mrimdi9cu2rg69hfjtqt3k.apps.googleusercontent.com', client_secret='yZ2Jm66hECA6cW42TaHXEmp9',
+google_blueprint = make_google_blueprint(client_id='260205772815-ho1c7bv4o7ij2rf4pckop1uuurshdumn.apps.googleusercontent.com', client_secret='gUT0d2u-H9ZNi8oLOWMSsz4Z',
                                          scope=['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile', 'openid'])
 app.register_blueprint(google_blueprint, url_prefix='/google_login')
 
@@ -1036,7 +1035,7 @@ def add_course():
 
         course_added = Course.query.filter_by(title=course_name).first()
 
-        send_email('longlivesaltienation@gmail.com', 'New Course Added on boyuanliu6.pythonanywhere.com', 'New course added, here is the detail information: <b>course id: {}, course title: {}</b>'.format(course_added.id, course_added.title))
+        send_email('longlivesaltienation@gmail.com', 'New Course Added on readsaltie.pythonanywhere.com', 'New course added, here is the detail information: <b>course id: {}, course title: {}</b>'.format(course_added.id, course_added.title))
 
         return render_template('success.html', message='Course added successfully, your course id is: {}. Please remember this id number'.format(str(course_added.id)))
 
