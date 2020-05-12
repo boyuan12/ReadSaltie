@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Notifications
+{% endblock %}
+
+{% block main %}
+    <ul>
+        {% for notification in notifications %}
+            {% if notification.status == 'unread' %}
+                <li><a href="{{ notification.link }}">{{ notification.message }}</a></li>
+            {% else %}
+                <li style="color:gray"><a href="{{ notification.link }}" style="color:gray">{{ notification.message }}</a></li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+{% endblock %}

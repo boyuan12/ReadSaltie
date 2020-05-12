@@ -5,7 +5,7 @@
 {% endblock %}
 
 {% block main %}
-    <form method="post">
+    <form method="post" action="/register" enctype="multipart/form-data">
         <h3>Register</h3>
         <div class="form-group">
             <label for="exampleFormControlInput1">Email address</label>
@@ -23,6 +23,7 @@
             <label for="exampleFormControlInput4">Password Confirmation</label>
             <input type="password" class="form-control" id="exampleFormControlInput4" name="confirmation" required>
         </div>
+        Upload your profile picture: <input type="file" name="image">
         <div class="custom-control custom-checkbox">
             <input type="checkbox" class="custom-control-input" id="customCheck1" required>
             <label class="custom-control-label" for="customCheck1" id="checkbox">Check this checkbox that you've read and agree Term of Use and Privacy Policy</label>

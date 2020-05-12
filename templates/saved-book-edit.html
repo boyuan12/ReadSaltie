@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Add Book Editor
+{% endblock %}
+
+{% block main %}
+    <script src="https://cdn.ckeditor.com/4.14.0/standard/ckeditor.js"></script>
+    <h1>Add Book Editor</h1>
+
+    <form action="/books/add" method='post' enctype="multipart/form-data">
+        Title: <input type="title" id="title" value="{{ book.title }}" readonly name="title" required><br>
+        Description: <textarea id="description" name="description" required>{{ book.description }}</textarea>
+        <textarea cols="80" id="editor1" name="embed" rows="10" data-sample-short required>{{ book.contents }}</textarea> <br>
+        <input type="file" name="image">
+        <button type="submit">Publish</button>
+    </form>
+
+    <p id="status">Status for auto-save: </p>
+
+    <script>
+        var embed = CKEDITOR.replace('embed', {
+          height: 400,
+          baseFloatZIndex: 10005
+        });
+
+        embed.on('change', function(ev) {
+            $.ajax('/book/add-manually', {
+                type: 'POST',
+                data: { title: document.getElementById('title').value, contents: embed.getData(), description: document.getElementById('description').value },  // data to submit
+                success: function (data) {
+                    document.getElementById('status').innerHTML = 'Status for auto-save: <span style="color:green">Success</span>';
+                },
+                error: function (error) {
+                    document.getElementById('status').innerHTML = 'Status for auto-save: <span style="color:green">Error</span>';
+                }
+            });
+        })
+    </script>
+{% endblock %}

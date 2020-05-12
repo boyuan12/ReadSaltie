@@ -15,7 +15,7 @@
         {% for book in books %}
             <!--{{ book.embedCode|safe }}-->
               <div class="row">
-                <div class="col-9"><h2><a href="/books/read/{{ book.title }}">{{ book.title }}</a></h2></div>
+                <div class="col-9"><h2><a href="/books/read/{{ book.access }}">{{ book.title }}</a></h2></div>
                 <div class="col-4">
                     <img src="{{ url_for('static', filename=book.image_name) }}" width="120"> <br>
                     <p>Rating: {{ '%0.2f' % book.rating | float }} / 5</p>

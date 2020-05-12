@@ -2,7 +2,7 @@
 <html>
     <head>
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-        <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
         <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
         <script src="https://kit.fontawesome.com/13beda203e.js" crossorigin="anonymous"></script>
@@ -12,16 +12,71 @@
         <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
         <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3.0.0/es5/tex-mml-chtml.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/10.0.0/markdown-it.js"></script>
+        <style>
+            .notification {
+              background-color: #555;
+              color: white;
+              text-decoration: none;
+              padding: 15px 26px;
+              position: relative;
+              display: inline-block;
+              border-radius: 2px;
+            }
+
+            .notification:hover {
+              background: red;
+            }
+
+            .notification .badge {
+              position: absolute;
+              top: -10px;
+              right: -10px;
+              padding: 5px 10px;
+              border-radius: 50%;
+              background: red;
+              color: white;
+            }
+
+            #sticky-footer {
+              position: fixed;
+              left: 0;
+              bottom: 0;
+              width: 100%;
+              background-color: red;
+              color: white;
+              text-align: center;
+            }
+
+            html {
+              position: relative;
+              min-height: 100%;
+            }
+            body {
+              margin-bottom: 60px; /* Margin bottom by footer height */
+            }
+            .footer {
+              position: absolute;
+              bottom: 0;
+              width: 100%;
+              height: 60px; /* Set the fixed height of the footer here */
+              line-height: 60px; /* Vertically center the text there */
+              background-color: #f5f5f5;
+            }
+
+        </style>
     </head>
-    <body>
-        <h1>Rise Up Salties!!!</h1>
+    <body oncopy="Content is Copyrighted" oncut="Content is Copyrighted">
         <nav class="navbar navbar-light bg-light">
             <a class="navbar-brand" href="#">
-                <img src="/static/logo.png" width="30" height="30" class="d-inline-block align-top" alt="Flag/Logo">
+                <img src="/static/Logo.png" width="30" height="30" class="d-inline-block align-top" alt="Flag/Logo">
                     ReadSaltie
             </a>
             {% if session.user_id %}
-                <h4>Welcome, {{ session.username }}, or <a href='/logout'>logout</a></h4>
+                <h4>Welcome, <span id="username">{{ session.username }}</span>, or <a href='/logout'>logout</a></h4>
+                <a href="#" class="notification">
+                    <span onclick="window.location.replace('/notifications')">Inbox</span>
+                    <span class="badge">{{ session.notification_count }}</span>
+                </a>
                 <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -38,9 +93,6 @@
                         </li>
                         <li class="nav-item active">
                                 <a class="nav-link" href="/books">Books <span class="sr-only">(current)</span></a>
-                        </li>
-                        <li class="nav-item active">
-                                <a class="nav-link" href="/courses">Courses <span class="sr-only">(current)</span></a>
                         </li>
                     </ul>
                 </div>
@@ -65,6 +117,7 @@
                         </li>
                     </ul>
                 </div>
+
             {% endif %}
         </nav>
         {% for message in get_flashed_messages(with_categories=True) %}
@@ -74,8 +127,19 @@
             </div>
         {% endfor %}
         {% block main %}{% endblock %}
-        <div class="card-footer text-muted">
-            Web App 0.0.1
-        </div>
+        <footer class="footer">
+          <div class="container">
+            <span class="text-muted">Place sticky footer content here.</span>
+          </div>
+        </footer>
+        <script>
+            (function(i,m,a,g,e) {
+              e = i.getElementsByTagName(m)[0], (g = i.createElement(m)).src = "//pcdn.piiojs.com/"+a+"/image.min.js",
+              g.onerror = function() {
+                  (g = i.createElement(m)).src = "https://fs.piio.co/image-failover.min.js",
+                  e.parentNode.insertBefore(g, e);
+              }, e.parentNode.insertBefore(g, e);
+              }(document, "script", "ofibho"));
+        </script>
     </body>
 </html>

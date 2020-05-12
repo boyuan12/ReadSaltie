@@ -10,6 +10,7 @@
 
 {% block main %}
     <meta name="google-site-verification" content="WgZY-Xe4ab1gUfII9eRTFOlwBrimaSeup4kPaBFZNX8" />
+    <!--
     <script>
         $('.carousel').carousel()
     </script>
@@ -52,13 +53,8 @@
         </a>
       </div>
     <hr>
-    <h2>Popular Book</h2>
-    {% set list1 = contest.winner.split(',') %}
-    {% for i in range(list1|length) %}
-        {% if i % 2 == 0 %}
-            <p><a href="/books/read/{{ list1[i] }}">{{ list1[i] }} by {{ list1[i+1] }}</a></p>
-        {% endif %}
-    {% endfor %}
+    -->
+    <img src="https://ik.imagekit.io/readsaltie/READSALTIE_nG9mBb5QW.png" width="100%" height="500px">
     <h2>Wanna publish a book?</h2>
     <p>This website allows you to <a href="/books/add">publish your own book for free!!!</a></p>
     <h2>New Events

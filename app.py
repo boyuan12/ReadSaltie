@@ -1,6 +1,9 @@
 import os
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import calendar
+import json
+import string
+import random
 
 from flask import Flask, flash, render_template, session, request, redirect, url_for, abort, jsonify
 from flask_session import Session
@@ -12,6 +15,7 @@ from sqlalchemy import update, desc, text, asc
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_dance.consumer import oauth_authorized
 from static import *
+
 
 # Configure basic app information
 app = Flask(__name__, static_url_path='/static')
@@ -28,7 +32,7 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-maintenance_mode = True
+maintenance_mode = False
 @app.before_request
 def check_for_maintenance():
     if maintenance_mode:
@@ -75,6 +79,7 @@ class User(db.Model):
     password = db.Column(db.String(4096))
     status = db.Column(db.String(4096))
     verification = db.Column(db.String(4096))
+    picture = db.Column(db.Text)
 
 
 class Post(db.Model):
@@ -102,6 +107,8 @@ class Book(db.Model):
     contest = db.Column(db.String(10))
     rating = db.Column(db.String(10))
     view = db.Column(db.Integer)
+    access = db.Column(db.Text)
+    view_status = db.Column(db.Text)
 
 
 class Comment(db.Model):
@@ -153,6 +160,44 @@ class Contest(db.Model):
     begin = db.Column(db.String(20))
     end = db.Column(db.String(20))
 
+class Follower(db.Model):
+
+    __tablename__ = "followers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    following_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    owner_id = db.Column(db.Integer)
+
+class Notification(db.Model):
+
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    to_id = db.Column(db.Integer)
+    message = db.Column(db.Text)
+    link = db.Column(db.Text)
+    status = db.Column(db.String(100))
+
+class Saved_Book(db.Model):
+
+    __tablename__ = 'saved_book'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer)
+    title = db.Column(db.String(100))
+    description = db.Column(db.String(4096))
+    contents = db.Column(db.Text)
+
+
+class Analytic(db.Model):
+
+    __tablename__ = 'analytic'
+
+    id = db.Column(db.Integer, primary_key=True)
+    utm_source = db.Column(db.String(100))
+    datetime = db.Column(db.DateTime)
+
+
 # Create all database
 db.create_all()
 
@@ -160,34 +205,14 @@ db.create_all()
 # Index route
 @app.route("/")
 def home():
-    my_date = date.today()
-    contest_id = abs(my_date - date(2020, 3, 8)).days // 7
 
-    if calendar.day_name[my_date.weekday()] == 'Sunday':
-
-        # check whether the contest exist
-        contest = Contest.query.filter_by(title='Weekly Contest #' + str(contest_id)).first()
-        try:
-            if contest.title == 'Weekly Contest #' + str(contest_id):
-                contest = Contest.query.filter_by(title='Weekly Contest #' + str(contest_id)).first()
-                posts = Post.query.filter_by(location='Event')
-                return render_template("index.html", posts=posts, contest=contest)
-        except AttributeError:
-            pass
-
-        # get most viewed book
-        view_book = Book.query.order_by(desc(Book.view)).first()
-
-        # get most rated book
-        rate_book = Book.query.order_by(desc(Book.rating)).first()
-
-        contest = Contest(title='Weekly Contest #{}'.format(contest_id), winner=view_book.title + ',' + view_book.username + ',' + rate_book.title + ',' + rate_book.username, begin=my_date, end=str(date.today() + timedelta(days=6)))
-        db.session.add(contest)
+    if request.args.get("utm_source"):
+        analytics = Analytic(utm_source=request.args.get("utm_source"), datetime=datetime.datetime.now())
+        db.session.add(analytics)
         db.session.commit()
 
-    contest = Contest.query.filter_by(title='Weekly Contest #' + str(contest_id)).first()
     posts = Post.query.filter_by(location='Event')
-    return render_template("index.html", posts=posts, contest=contest)
+    return render_template("index.html", posts=posts)
 
 # register route
 @app.route("/register", methods=['GET', 'POST'])
@@ -230,8 +255,11 @@ def register():
         pwHash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
         verificationCode = randomString(75)
 
+        file = request.files["image"]
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], file.filename))
+
         # Add user
-        registrant = User(email=email, username=username, password=pwHash, status="user", verification=verificationCode)
+        registrant = User(email=email, username=username, password=pwHash, status="user", verification=verificationCode, picture=file.filename)
         db.session.add(registrant)
         db.session.commit()
 
@@ -282,6 +310,13 @@ def login():
         session["username"] = username
         session['status'] = status
         session['email'] = user.email
+
+        notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+        notification_count = 0
+        for notification in notifications:
+            if notification.status == 'unread':
+                notification_count += 1
+        session['notification_count'] = notification_count
 
         # Check if user is temporary banned from website
         if 'banned' in status is not True:
@@ -617,8 +652,12 @@ def book_add():
     if request.method == 'POST':
 
         # get request info
-        if not request.form.get('title') or not request.form.get('description') or not request.form.get('embed'):
-            return render_template('alert.html', message='Make sure you filled out all required field(s)!')
+        if not request.form.get('title'):
+            return render_template('alert.html', message='You didn\'t provide title')
+        if not request.form.get('description'):
+            return render_template('alert.html', message='You didn\'t provide desc')
+        if not request.form.get('embed'):
+            return render_template('alert.html', message='You didn\'t provide embed')
 
         # Check for XSS security
         if "script" in request.form.get('embed') is not True or "onerror" in request.form.get('embed') is not True:
@@ -640,16 +679,14 @@ def book_add():
 
         if "?" in title:
             return render_template('alert.html', message='Sorry, ? is restricted symbol. You may not publish any book with title that contains ?.')
-        # Check whether the title already exist or not
-        try:
-            if titleDb.title == title:
-                return render_template('alert.html', message='Title already used.')
-        except AttributeError:
-            pass
 
         # Get required information
         description = request.form.get('description')
         embed = request.form.get('embed')
+
+        if "iframe" in embed is False:
+            embed = '<iframe srcdoc=' + embed + ' width="1000" height="1000" frameborder="0"></iframe>'
+
 
         # Get current time
         ts = datetime.datetime.now().timestamp()
@@ -662,18 +699,27 @@ def book_add():
         # Add special admin badge in author when its author is an admin
         if session['status'] == 'admin':
             book = Book(username=session['username'] + " (admin)", timestamp=timestamp,
-                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'))
+                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'), access=randomString(10), view_status=request.form.get('view_status'))
         elif session['status'] == 'staff':
             book = Book(username=session['username'] + " (staff)", timestamp=timestamp,
-                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'))
+                        title=title, description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'), access=randomString(10), view_status=request.form.get('view_status'))
         else:
             book = Book(username=session['username'], timestamp=timestamp, title=title,
-                        description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'))
+                        description=description, image_name=file.filename, embedCode=embed, rating='No rating', view=0, contest=request.form.get('contest'), access=randomString(10), view_status=request.form.get('view_status'))
 
         # Add book
         db.session.add(book)
         db.session.commit()
+
+        # Add Notification
+        followers = Follower.query.filter_by(following_id=session.get('user_id'))
+        for follower in followers:
+            notification = Notification(to_id=follower.owner_id, message='{} published a new book, called {}.'.format(session.get('username'), title), link="/books/read/{}".format(title), status='unread')
+            db.session.add(notification)
+            db.session.commit()
+
         return render_template('success.html', message='success', link="/books/read/" + title)
+
     else:
         return render_template('admin-books-add.html')
 
@@ -721,11 +767,11 @@ def admin_book_delete():
 # Read a book
 viewRanList = [];
 
-@app.route('/books/read/<string:title>')
-def read_book(title):
+@app.route('/books/read/<string:access>')
+def read_book(access):
 
     # find appropriate title based on route
-    titleDb = Book.query.filter_by(title=title).all()
+    titleDb = Book.query.filter_by(access=access).all()
 
     # generate random book string
     random_str = randomString(75)
@@ -733,7 +779,8 @@ def read_book(title):
 
     # Check for all title, see which one matches
     for titles in titleDb:
-        if titles.title == title:
+        if titles.access == access:
+            title = titles.title
             comments = Comment.query.filter_by(location=title).all()
             return render_template('book-read.html', id=titles.id, embedCode=titles.embedCode, title=titles.title, comments=comments, randomString=random_str)
 
@@ -808,7 +855,17 @@ def rating():
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html')
+    if session.get('status') == 'admin':
+        books = Book.query.filter_by(username=session.get('username') + ' (admin)')
+    elif session.get('status') == 'staff':
+        books = Book.query.filter_by(username=session.get('username') + ' (staff)')
+    else:
+        books = Book.query.filter_by(username=session.get('username'))
+
+    following = Follower.query.join(User, Follower.following_id == User.id).add_columns(User.username, Follower.following_id).filter(Follower.owner_id == session.get('user_id'))
+    saved_books = Saved_Book.query.filter_by(user_id=session.get('user_id'))
+
+    return render_template('profile.html', books=books, following=following, saved_books=saved_books)
 
 
 # user can edit their username
@@ -861,6 +918,27 @@ def change_email():
                "Hello, your account at https://readsaltie.pythonanywhere.com has just changed its email address.")
     return render_template('success.html', message="Email changed success, check your email for verification.")
 
+
+@app.route("/profile/delete", methods=["POST"])
+def delete():
+
+    User.query.filter_by(id=session.get("user_id")).delete()
+    db.session.commit()
+    session.clear()
+    return redirect("/")
+
+@app.route('/profile/<string:username>/delete/<int:book_id>')
+@login_required
+def profile_delete_book(username, book_id):
+
+    if session.get('username') != username:
+        abort(403)
+
+    Book.query.filter(Book.id == book_id).delete(synchronize_session='evaluate')
+    db.session.commit()
+
+    flash('Delete Success', category='success')
+    return redirect(url_for('profile'))
 
 # see all admin posts
 @app.route('/admin/post/all')
@@ -940,6 +1018,7 @@ def google_authorized(blueprint, token):
     resp = google.get("/oauth2/v1/userinfo")
     assert resp.ok, resp.text
     email = resp.json()['email']
+    image = resp.json()['picture']
     if resp.json()['verified_email'] != True:
         return render_template('alert.html', message='You must verify your Google Account\' email first.')
     userEmail = User.query.filter_by(email=email).first()
@@ -952,6 +1031,12 @@ def google_authorized(blueprint, token):
             session['verification'] = userEmail.verification
             session['oauth'] = 'Google'
             session['verification'] = 'verified'
+            notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+            notification_count = 0
+            for notification in notifications:
+                if notification.status == 'unread':
+                    notification_count += 1
+            session['notification_count'] = notification_count
             if userEmail.status == 'banned':
                 session.clear()
                 flash('Hello, you are temporaily banned from ReadSaltie, please wait for further notice. Thanks', category='danger')
@@ -960,7 +1045,7 @@ def google_authorized(blueprint, token):
                 return redirect('/')
     except AttributeError:
         pass
-    registrant = User(email=email, username=email, password="(Google)", status="user")
+    registrant = User(email=email, username=email, password="(Google)", status="user", picture=image)
     db.session.add(registrant)
     db.session.commit()
     userAfter = User.query.filter_by(email=email).first()
@@ -969,9 +1054,16 @@ def google_authorized(blueprint, token):
     session['status'] = userAfter.status
     session['email'] = email
     session['verification'] = 'verified'
+    session['oauth'] = 'Google'
     if userAfter.status == 'banned':
         flash('Hello, you are temporaily banned from ReadSaltie, please wait for further notice. Thanks', category='danger')
     else:
+        notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+        notification_count = 0
+        for notification in notifications:
+            if notification.status == 'unread':
+                notification_count += 1
+        session['notification_count'] = notification_count
         return redirect('/')
 
 
@@ -1019,66 +1111,146 @@ def admin_send_email():
         return render_template('admin-send-email.html')
 
 
-@app.route('/admin/add-course', methods=['GET', 'POST'])
-@admin_required
-def add_course():
-
-    if request.method == 'POST':
-
-        course_name = request.form.get('course_name')
-        description = request.form.get('description')
-        category = request.form.get('category')
-
-        course = Course(title=course_name, description=description, category=category)
-        db.session.add(course)
-        db.session.commit()
-
-        course_added = Course.query.filter_by(title=course_name).first()
-
-        send_email('longlivesaltienation@gmail.com', 'New Course Added on readsaltie.pythonanywhere.com', 'New course added, here is the detail information: <b>course id: {}, course title: {}</b>'.format(course_added.id, course_added.title))
-
-        return render_template('success.html', message='Course added successfully, your course id is: {}. Please remember this id number'.format(str(course_added.id)))
-
-    else:
-        return render_template('admin-add-course.html')
-
-@app.route('/admin/add-course-content', methods=['GET', 'POST'])
-@admin_required
-def add_course_content():
-
-    if request.method == 'POST':
-
-        contents = request.form.get('contents')
-        course_id = request.form.get('course_id')
-
-        course = Course_Content(course_id=course_id, contents=contents)
-        db.session.add(course)
-        db.session.commit()
-
-        return render_template('success.html', message='Course Content added successfully.')
-
-    else:
-        return render_template('admin-add-course-content.html')
-
-@app.route('/courses')
-@login_required
-def courses():
-
-    courses = Course.query.all()
-
-    return render_template('courses.html', courses=courses)
-
-@app.route('/course/<int:course_id>')
-@login_required
-def course_title(course_id):
-
-    courses = Course.query.join(Course_Content, Course.id==Course_Content.course_id).add_columns(Course.id, Course.title, Course_Content.contents).filter_by(course_id=course_id)
-
-    return render_template('course-detail.html', courses=courses)
-
-
 @app.route('/survey')
 @login_required
 def survey():
 
     return render_template('survey.html')
+
+
+@app.route('/profile/<string:username>')
+@login_required
+def public_profile(username):
+
+    user = User.query.filter_by(username=username).first()
+
+    try:
+        username = user.username
+    except:
+        abort(404)
+
+    if user.status == 'admin':
+        books = Book.query.filter_by(username=username + " (admin)")
+    elif user.status == 'staff':
+        books = Book.query.filter_by(username=username + " (staff)")
+    else:
+        books = Book.query.filter_by(username=username)
+
+    return render_template('public-profile.html', user=user, books=books)
+
+
+@app.route('/follow/<int:user_id>')
+@login_required
+def follow(user_id):
+
+    users = Follower.query.filter_by(owner_id=session.get('user_id'))
+    for user in users:
+        if user.following_id == user_id:
+            return render_template('alert.html', message='Already Followed')
+
+    if user_id == session.get('user_id'):
+        return render_template('alert.html', message='You can\'t follow yourself.')
+
+    follower = Follower(following_id=user_id, owner_id=session.get('user_id'))
+    db.session.add(follower)
+    db.session.commit()
+
+    return render_template('success.html', message='Follow Success')
+
+
+@app.route('/notifications')
+@login_required
+def notification():
+
+    notifications = Notification.query.filter_by(to_id=session.get('user_id'))
+
+    for notification in notifications:
+        notification.status == 'read'
+        db.session.commit()
+
+    return render_template('notifications.html', notifications=notifications)
+
+
+@app.route('/book/add-manually', methods=['GET', 'POST'])
+@login_required
+def add_book_editor():
+
+    if request.method == 'POST':
+
+        if not request.form.get('title') or not request.form.get('contents') or not request.form.get('description'):
+            return jsonify({'error': 'please fill out ALL required fields'})
+
+        title = request.form.get('title')
+        contents = request.form.get('contents')
+        description = request.form.get('description')
+
+        book_saved = Saved_Book.query.filter_by(user_id=session.get('user_id'))
+        for book in book_saved:
+            if book.title == title:
+                book.contents=contents
+                book.description=description
+                db.session.commit()
+                return jsonify({'success': 'success'})
+
+        book = Saved_Book(user_id=session.get('user_id'), title=title, contents=contents)
+
+        db.session.add(book)
+        db.session.commit()
+
+        return jsonify({'success': 'success'})
+    else:
+        return render_template('add-book-editor.html')
+
+
+@app.route('/saved_book/edit/<string:title>')
+@login_required
+def saved_book_edit(title):
+
+    book = Saved_Book.query.filter_by(title=title).first()
+
+    if book.user_id != session.get('user_id'):
+        abort(403)
+
+    return render_template('saved-book-edit.html', book=book)
+
+
+@app.route('/saved_book/delete/<string:title>')
+@login_required
+def saved_book_delete(title):
+
+    book = Saved_Book.query.filter_by(title=title).first()
+
+    if book.user_id != session.get('user_id'):
+        abort(403)
+
+    Saved_Book.query.filter(Saved_Book.title == title).delete(synchronize_session='evaluate')
+    db.session.commit()
+
+    flash('success', category='success')
+    return redirect(url_for('profile'))
+
+
+@app.route('/unfollow/<int:user_id>')
+@login_required
+def unfollow(user_id):
+
+    if user_id == session.get('user_id'):
+        return render_template('alert.html', message='You can\'t follow yourself.')
+
+    Follower.query.filter(Follower.following_id == user_id).delete(synchronize_session='evaluate')
+    db.session.commit()
+
+    return render_template('success.html', message='Unfollow Success')
+
+
+@app.route('/changelog')
+def changelog():
+    return render_template('changelog.html')
+
+
+@app.route("/admin/analytics")
+@admin_required
+def analytics():
+
+    datas = Analytic.query.all()
+    return render_template("admin-analytics.html", datas=datas)

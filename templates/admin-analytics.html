@@ -1,0 +1,15 @@
+{% extends "admin-layout.html" %}
+
+{% block title %}
+    Analytics
+{% endblock %}
+
+{% block main %}
+    <h1>Analytics</h1>
+    {% for data in datas %}
+        <div>
+            <p>utm_source: {{ data.utm_source }}</p>
+            <p>DateTime: {{ data.datetime }}</p>
+        </div> <br>
+    {% endfor %}
+{% endblock %}

@@ -31,7 +31,49 @@
             <input type="email" name="new_email">
             <button type="submit">Change Email</button>
         </form>
+        <hr>
+        <h4 style="color: red">ACCOUNT DELETION!</h4>
+        <p>Are you sure you want to delete? This action can't be undone. Are you really sure?</p>
+        <p>Also, you can re-register but everything you did will be deleted (book, following, comments, etc).</p>
+        <p>Click on this button to confirm deletion</p>
+        <form action="/profile/delete" method="post">
+            <button type="submit" style="background-color:red;">Delete</button>
+        </form>
     {% else %}
-        <h3 style="color: red">Sorry, since this is an google account, you can't change email and password.</h3>
+        <h3 style="color: red">Sorry, since this is an google account, you can't change email, password and profile picture.</h3>
+        <p>To change profile picture, please do that in your Google Account.</p>
     {% endif %}
+    <br>
+    <h4>Books Published</h4>
+    <div class="container">
+        {% for book in books %}
+          <div class="row">
+                <div class="col-9"><h2><a href="/books/read/{{ book.title }}">{{ book.title }}</a></h2></div>
+                <div class="col-4">
+                    <img src="{{ url_for('static', filename=book.image_name) }}" width="120"> <br>
+                    <p>Rating: {{ '%0.2f' % book.rating | float }} / 5</p>
+                </div>
+                <div class="col-6">
+                    <p>{{ book.description }}</p> <br>
+                    <p><a href="/profile/{{ session['username'] }}/delete/{{ book.id }}">delete this book</a></p>
+                    <p>Published on: {{ book.timestamp }}</p>
+                </div>
+            <hr>
+            </div>
+        {% endfor %}
+    </div>
+    <hr>
+    <h4>Draft Books</h4>
+    <ul>
+        {% for book in saved_books %}
+            <li><a href="/saved_book/edit/{{ book.title }}">{{ book.title }}</a> <a href="/saved_book/delete/{{ book.title }}">(delete)</a></li>
+        {% endfor %}
+    </ul>
+    <hr>
+    <h4>Following: </h4>
+    <ul>
+        {% for follow in following %}
+            <li><a href="/profile/{{ follow.username }}">{{ follow.username }}</a> <a href="/unfollow/{{ follow.following_id }}">(unfollow)</a></li>
+        {% endfor %}
+    </ul>
 {% endblock %}

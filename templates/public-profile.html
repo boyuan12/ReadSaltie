@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Profile of {{ user.username }}
+{% endblock %}
+
+{% block main %}
+    <link href="https://fonts.googleapis.com/css2?family=Sen:wght@800&display=swap" rel="stylesheet">
+    <h1 style="text-align: center;">@<u style="font-family: 'Sen', sans-serif;">{{ user.username }}</u></h1>
+    {% if user.password == '(Google)' %}
+        <img src="{{ user.picture }}" height="300px" width="300px" style="border-radius: 50%; display: block; margin-left: auto; margin-right: auto;" height="300px" width="300px">
+    {% elif user.picture == None %}
+        <img src="/static/default_profile_picture.jpg" height="300px" width="300px" style="border-radius: 50%; display: block; margin-left: auto; margin-right: auto;" height="300px" width="300px">
+    {% else %}
+        <img src="/static/{{ user.picture }}" style="border-radius: 50%; display: block; margin-left: auto; margin-right: auto;" height="300px" width="300px">
+    {% endif %}
+    <button type="button" class="btn btn-primary" style="position: fixed; bottom: 100; left: 400px;" onclick="window.location.replace('/follow/{{ user.id }}')">Follow</button>
+    <button type="button" class="btn btn-success" style="position: fixed; bottom: 100; right: 400px;" disabled>Message</button>
+    <hr>
+    <h2>Book Published</h2>
+    {% for i in range(1) %}
+        <div class="row">
+            {% for book in books %}
+                <div class="col-6 col-md-4"><a href="/books/read/{{ book.title }}">{{ book.title }}</a></div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+{% endblock %}
